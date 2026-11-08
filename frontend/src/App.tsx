@@ -7,39 +7,27 @@ import {
 } from './types/grid';
 
 const SCENARIOS = [
-  { id: 'NOMINAL', code: 'SCN-01', label: 'NOMINAL 50HZ' },
-  { id: 'EVENING_PEAK', code: 'SCN-02', label: 'EVENING PEAK (+60%)' },
-  { id: 'CLOUD_TRANSIENT', code: 'SCN-03', label: 'PV CLOUD DROP (-80%)' },
-  { id: 'UPSTREAM_BLACKOUT', code: 'SCN-04', label: 'PCC OUTAGE (ISLAND)' },
+  { id: 'NOMINAL', label: 'Nominal' },
+  { id: 'EVENING_PEAK', label: 'Evening peak' },
+  { id: 'CLOUD_TRANSIENT', label: 'Cloud cover' },
+  { id: 'UPSTREAM_BLACKOUT', label: 'Grid outage' },
 ];
 
 const STRATEGIES = [
   {
     id: 'PROPORTIONAL_DROOP',
-    code: 'LAW-01',
-    name: 'Proportional Frequency-Watt Droop',
-    threshold: 'Load > 82% or Imbalance < -15 kW',
-    formula: 'P_bess = min(P_max, max(20, P_dem - 0.76 * S_rated))',
-    description:
-      'Balances transformer peak shaving with demand-response curtailment when residual load exceeds 88%.',
+    name: 'Proportional droop',
+    summary: 'Balances battery peak shaving with commercial load curtailment above 88% transformer load.',
   },
   {
     id: 'AGGRESSIVE_PEAK_SHAVING',
-    code: 'LAW-02',
-    name: 'Aggressive Transformer Peak-Shaving',
-    threshold: 'Load > 68% of 500 kVA (340 kW cap)',
-    formula: 'P_bess = min(P_max, P_dem - 0.68 * S_rated)',
-    description:
-      'Strictly caps Kasarani 500 kVA loading at 68% to minimize IEC 60076-7 winding hot-spot thermal aging.',
+    name: 'Aggressive peak shaving',
+    summary: 'Caps transformer loading at 68% (340 kW) to minimize winding hot-spot thermal aging.',
   },
   {
     id: 'CONSERVATIVE_CLINIC_RESERVE',
-    code: 'LAW-03',
-    name: 'Conservative Clinic Islanding Reserve',
-    threshold: 'Curtail SME first; discharge BESS only if Load > 82% & SoC > 40%',
-    formula: 'Curtail = 0.68; P_bess = max(0, 0.80 * P_dem - 0.78 * S_rated)',
-    description:
-      'Prioritizes high battery State of Charge for extended upstream blackouts by shedding flexible commercial load first.',
+    name: 'Clinic reserve',
+    summary: 'Preserves battery charge for extended blackouts by curtailing flexible commercial load first.',
   },
 ];
 
@@ -69,7 +57,7 @@ function buildFallbackSubsystems(
 ): SubsystemsPayload {
   const upstreamOnline = (nodes.find((n) => n.node_id === 'GEN-OLK-01')?.active_power_kw ?? 0) > 0;
   const thermalPenalty = transformerLoadPct > 75 ? (transformerLoadPct - 75) * 0.12 : 0;
-  const wTr = Number((0.8 + thermalPenalty).toFixed(3));
+  const wTr = Number((0.8 + thermalPenalty).toFixed(2));
 
   const hospitalPath = !upstreamOnline
     ? ['GEN-SOL-02', 'BESS-KSM-01', 'LOAD-HOSP-01']
@@ -79,21 +67,21 @@ function buildFallbackSubsystems(
 
   const hospitalCost = !upstreamOnline
     ? 1.6
-    : Number((1.2 + Math.min(wTr + 0.7, 1.1 + thermalPenalty * 0.5)).toFixed(3));
+    : Number((1.2 + Math.min(wTr + 0.7, 1.1 + thermalPenalty * 0.5)).toFixed(2));
 
   const mstEdges = upstreamOnline
     ? [
         { from: 'GEN-OLK-01', to: 'TR-NRB-04', weight: 1.2, line: '132kV Naivasha-Nairobi Trunk' },
-        { from: 'TR-NRB-04', to: 'BESS-KSM-01', weight: wTr, line: '415V Secondary Bus A' },
-        { from: 'BESS-KSM-01', to: 'LOAD-HOSP-01', weight: 0.7, line: 'Priority-1 Critical Microgrid Bus' },
-        { from: 'BESS-KSM-01', to: 'GEN-SOL-02', weight: 0.9, line: 'DC-Coupled Inverter Tie' },
-        { from: 'BESS-KSM-01', to: 'LOAD-COMM-02', weight: 1.3, line: 'Curtailable Commercial Feeder' },
+        { from: 'TR-NRB-04', to: 'BESS-KSM-01', weight: wTr, line: '415V Secondary Bus' },
+        { from: 'BESS-KSM-01', to: 'LOAD-HOSP-01', weight: 0.7, line: 'Priority-1 Clinic Feeder' },
+        { from: 'BESS-KSM-01', to: 'GEN-SOL-02', weight: 0.9, line: 'DC-Coupled Solar Tie' },
+        { from: 'BESS-KSM-01', to: 'LOAD-COMM-02', weight: 1.3, line: 'Commercial Feeder' },
       ]
     : [
-        { from: 'GEN-SOL-02', to: 'BESS-KSM-01', weight: 0.9, line: 'DC-Coupled Inverter Tie' },
-        { from: 'BESS-KSM-01', to: 'LOAD-HOSP-01', weight: 0.7, line: 'Priority-1 Critical Microgrid Bus' },
-        { from: 'BESS-KSM-01', to: 'TR-NRB-04', weight: wTr, line: '415V Secondary Bus A' },
-        { from: 'BESS-KSM-01', to: 'LOAD-COMM-02', weight: 1.3, line: 'Curtailable Commercial Feeder' },
+        { from: 'GEN-SOL-02', to: 'BESS-KSM-01', weight: 0.9, line: 'DC-Coupled Solar Tie' },
+        { from: 'BESS-KSM-01', to: 'LOAD-HOSP-01', weight: 0.7, line: 'Priority-1 Clinic Feeder' },
+        { from: 'BESS-KSM-01', to: 'TR-NRB-04', weight: wTr, line: '415V Secondary Bus' },
+        { from: 'BESS-KSM-01', to: 'LOAD-COMM-02', weight: 1.3, line: 'Commercial Feeder' },
       ];
 
   const geoKw = nodes.find((n) => n.node_id === 'GEN-OLK-01')?.active_power_kw ?? 0;
@@ -101,34 +89,34 @@ function buildFallbackSubsystems(
   const hospKw = nodes.find((n) => n.node_id === 'LOAD-HOSP-01')?.active_power_kw ?? 0;
   const commKw = nodes.find((n) => n.node_id === 'LOAD-COMM-02')?.active_power_kw ?? 0;
 
-  const genNet = Number((geoKw + solKw).toFixed(2));
-  const distNet = Number((bessDispatchKw - hospKw - commKw).toFixed(2));
+  const genNet = Number((geoKw + solKw).toFixed(1));
+  const distNet = Number((bessDispatchKw - hospKw - commKw).toFixed(1));
 
   const zoneHierarchy: ZoneHierarchyNode = {
     id: 'ZONE-KE-CORRIDOR',
-    name: 'Kenya Rift-Nairobi Grid Corridor',
+    name: 'Kenya Rift-Nairobi Corridor',
     type: 'DISTRIBUTION_ZONE',
-    net_power_kw: Number((genNet + distNet).toFixed(2)),
+    net_power_kw: Number((genNet + distNet).toFixed(1)),
     children: [
       {
         id: 'ZONE-RIFT-GEN',
-        name: 'Rift Valley Renewable Generation Zone',
+        name: 'Rift Valley Generation',
         type: 'DISTRIBUTION_ZONE',
         net_power_kw: genNet,
         children: [
-          { id: 'GEN-OLK-01', name: 'Olkaria Geothermal', type: 'LEAF_ASSET', role: 'GENERATION', net_power_kw: geoKw },
-          { id: 'GEN-SOL-02', name: 'Nakuru Solar Array', type: 'LEAF_ASSET', role: 'GENERATION', net_power_kw: solKw },
+          { id: 'GEN-OLK-01', name: 'Olkaria Geothermal', type: 'LEAF_ASSET', role: 'Generation', net_power_kw: geoKw },
+          { id: 'GEN-SOL-02', name: 'Nakuru Solar Array', type: 'LEAF_ASSET', role: 'Generation', net_power_kw: solKw },
         ],
       },
       {
         id: 'ZONE-NRB-NORTH',
-        name: 'Nairobi North Secondary Microgrid',
+        name: 'Nairobi North Microgrid',
         type: 'DISTRIBUTION_ZONE',
         net_power_kw: distNet,
         children: [
-          { id: 'BESS-KSM-01', name: 'LFP Storage Inverter', type: 'LEAF_ASSET', role: 'STORAGE_INJECTION', net_power_kw: bessDispatchKw },
-          { id: 'LOAD-HOSP-01', name: 'Referral Clinic', type: 'LEAF_ASSET', role: 'LOAD_DEMAND', net_power_kw: -hospKw },
-          { id: 'LOAD-COMM-02', name: 'SME Market Hub', type: 'LEAF_ASSET', role: 'LOAD_DEMAND', net_power_kw: -commKw },
+          { id: 'BESS-KSM-01', name: 'LFP Battery Storage', type: 'LEAF_ASSET', role: 'Storage', net_power_kw: bessDispatchKw },
+          { id: 'LOAD-HOSP-01', name: 'Referral Clinic', type: 'LEAF_ASSET', role: 'Critical load', net_power_kw: -hospKw },
+          { id: 'LOAD-COMM-02', name: 'Agro-Processing Hub', type: 'LEAF_ASSET', role: 'Flexible load', net_power_kw: -commKw },
         ],
       },
     ],
@@ -152,7 +140,7 @@ function buildFallbackSubsystems(
     const b6 = Math.max(0, Math.min(255, Math.round(n.load_pct)));
     const crc = computeCrc8([b0, b1, b2, b3, b4, b5, b6]);
     const hex = [b0, b1, b2, b3, b4, b5, b6, crc]
-      .map((x) => `0x${x.toString(16).toUpperCase().padStart(2, '0')}`)
+      .map((x) => x.toString(16).toUpperCase().padStart(2, '0'))
       .join(' ');
     const bin1 = b1.toString(2).padStart(8, '0');
     return {
@@ -160,11 +148,11 @@ function buildFallbackSubsystems(
       hex_frame: hex,
       register_breakdown: {
         sync_byte: '0xA5',
-        id_status_bits: `0b${bin1.slice(0, 4)}_${bin1.slice(4)}`,
-        volt_fixed16: `0x${vDv.toString(16).toUpperCase().padStart(4, '0')} (${vDv} dV)`,
-        freq_fixed16: `0x${fChz.toString(16).toUpperCase().padStart(4, '0')} (${fChz} cHz)`,
-        load_uint8: `0x${b6.toString(16).toUpperCase().padStart(2, '0')} (${b6}%)`,
-        crc8_checksum: `0x${crc.toString(16).toUpperCase().padStart(2, '0')} (VALID)`,
+        id_status_bits: `${bin1.slice(0, 4)}:${bin1.slice(4)}`,
+        volt_fixed16: `${(vDv / 10).toFixed(1)} V`,
+        freq_fixed16: `${(fChz / 100).toFixed(2)} Hz`,
+        load_uint8: `${b6}%`,
+        crc8_checksum: `0x${crc.toString(16).toUpperCase().padStart(2, '0')}`,
       },
     };
   });
@@ -188,7 +176,7 @@ function buildFallbackSubsystems(
       radial_topology: {
         root: upstreamOnline ? 'GEN-OLK-01' : 'GEN-SOL-02',
         edges: mstEdges,
-        total_mst_impedance: Number(mstEdges.reduce((a, b) => a + b.weight, 0).toFixed(3)),
+        total_mst_impedance: Number(mstEdges.reduce((a, b) => a + b.weight, 0).toFixed(2)),
         connected_nodes_count: upstreamOnline ? 6 : 5,
       },
     },
@@ -198,10 +186,10 @@ function buildFallbackSubsystems(
       zone_hierarchy: zoneHierarchy,
     },
     concurrency_engine: {
-      synchronizer_type: 'Reentrant Mutex (RLock) + Atomic CAS Version Guard',
+      synchronizer_type: 'Reentrant Mutex (RLock) + Compare-And-Swap',
       ring_buffer_capacity: 32,
       frames_processed_seq: tick,
-      buffer_occupancy_pct: Number(((Math.min(tick, 32) / 32) * 100).toFixed(1)),
+      buffer_occupancy_pct: Number(((Math.min(tick, 32) / 32) * 100).toFixed(0)),
       lock_acquisitions: tick * 2 + 4,
       cas_transitions_committed: Math.max(1, Math.floor(tick / 4)),
       race_conditions_prevented: 0,
@@ -209,15 +197,15 @@ function buildFallbackSubsystems(
     },
     rtu_frames: rtuFrames,
     safety_interlock: {
-      formula: 'Phi_safe = (D -> (S & (Q | R | ~P))) & (~P -> C) & C',
+      formula: '(D -> (S & (Q | R | ~P))) & (~P -> C) & C',
       invariant_satisfied: (!D || (S && (Q || R || !P))) && (P || C) && C,
       propositions: [
-        { symbol: 'P', label: 'Upstream Feeder Energized (52-PCC Closed)', value: P },
-        { symbol: 'Q', label: 'Transformer Thermal Guard (>82.0%)', value: Q },
-        { symbol: 'R', label: 'Frequency Droop Trigger (<49.65 Hz)', value: R },
-        { symbol: 'S', label: 'BESS Reserve Above Floor (>15.0%)', value: S },
-        { symbol: 'D', label: 'BESS Inverter Discharging (>0.0 kW)', value: D },
-        { symbol: 'C', label: 'Priority-1 Clinic Feeder Energized', value: C },
+        { symbol: 'P', label: 'Upstream feeder energized', value: P },
+        { symbol: 'Q', label: 'Transformer load > 82%', value: Q },
+        { symbol: 'R', label: 'Bus frequency < 49.65 Hz', value: R },
+        { symbol: 'S', label: 'Battery reserve > 15%', value: S },
+        { symbol: 'D', label: 'Battery inverter discharging', value: D },
+        { symbol: 'C', label: 'Referral clinic energized', value: C },
       ],
     },
     telemetry_analytics: nodes.map((n) => ({
@@ -234,7 +222,7 @@ function createInitialSnapshot(): TelemetrySnapshot {
   const nodes: GridNode[] = [
     {
       node_id: 'GEN-OLK-01',
-      node_name: 'Olkaria Geothermal Feeder',
+      node_name: 'Olkaria Geothermal',
       node_type: 'GENERATION',
       region: 'Rift Valley',
       rated_capacity_kw: 450.0,
@@ -247,7 +235,7 @@ function createInitialSnapshot(): TelemetrySnapshot {
     },
     {
       node_id: 'GEN-SOL-02',
-      node_name: 'Nakuru Solar PV Array',
+      node_name: 'Nakuru Solar Array',
       node_type: 'GENERATION',
       region: 'Rift Valley',
       rated_capacity_kw: 280.0,
@@ -260,7 +248,7 @@ function createInitialSnapshot(): TelemetrySnapshot {
     },
     {
       node_id: 'TR-NRB-04',
-      node_name: 'Kasarani 500kVA Step-Down',
+      node_name: 'Kasarani 500kVA Transformer',
       node_type: 'TRANSFORMER',
       region: 'Nairobi North',
       rated_capacity_kw: 500.0,
@@ -273,7 +261,7 @@ function createInitialSnapshot(): TelemetrySnapshot {
     },
     {
       node_id: 'BESS-KSM-01',
-      node_name: 'GridPulse LFP Storage (400kWh)',
+      node_name: 'LFP Battery Bank (400kWh)',
       node_type: 'STORAGE',
       region: 'Nairobi North',
       rated_capacity_kw: 250.0,
@@ -299,7 +287,7 @@ function createInitialSnapshot(): TelemetrySnapshot {
     },
     {
       node_id: 'LOAD-COMM-02',
-      node_name: 'SME Cold-Storage & Agro Hub',
+      node_name: 'Agro-Processing Hub',
       node_type: 'LOAD_FLEXIBLE',
       region: 'Nairobi North',
       rated_capacity_kw: 320.0,
@@ -328,10 +316,6 @@ function createInitialSnapshot(): TelemetrySnapshot {
       transformer_temp_c: 54.0,
       winding_hotspot_c: 66.4,
       thermal_aging_factor: 0.015,
-      forecast_demand_kw: 348.0,
-      forecast_error_pct: 0.0,
-      corridor_losses_kw: 11.2,
-      pcc_breaker_closed: true,
       bess_soc_pct: 78.0,
       bess_dispatch_kw: -25.0,
       clinic_uptime_pct: 100.0,
@@ -340,13 +324,12 @@ function createInitialSnapshot(): TelemetrySnapshot {
     recent_events: [
       {
         event_id: 1,
-        idempotency_key: 'EVT-INIT-0001A',
+        idempotency_key: 'EVT-0001',
         timestamp_utc: new Date().toISOString(),
         trigger_node_id: 'TR-NRB-04',
-        previous_state: 'BOOT',
+        previous_state: 'INIT',
         new_state: 'STABLE',
-        action_taken:
-          'SCADA telemetry synchronized (50.00 Hz). Kasarani 500kVA load at 69.6%; BESS trickle-charging (-25.0 kW).',
+        action_taken: 'Corridor synchronized at 50.00 Hz. Battery charging from surplus solar (-25.0 kW).',
         frequency_at_trigger_hz: 50.0,
         transformer_load_pct: 69.6,
         bess_dispatch_kw: -25.0,
@@ -356,18 +339,32 @@ function createInitialSnapshot(): TelemetrySnapshot {
   };
 }
 
+function formatStateLabel(state: string): string {
+  switch (state) {
+    case 'STABLE':
+      return 'Nominal';
+    case 'BESS_DISPATCH_ACTIVE':
+      return 'Battery dispatch';
+    case 'DEMAND_RESPONSE_SHED':
+      return 'Demand response';
+    case 'FAULT_ISLANDING':
+      return 'Islanded';
+    default:
+      return 'Unprotected overload';
+  }
+}
+
 export default function App() {
   const [snapshot, setSnapshot] = useState<TelemetrySnapshot>(createInitialSnapshot);
   const [backendConnected, setBackendConnected] = useState<boolean>(false);
-  const [history, setHistory] = useState<
-    Array<{ tick: number; freq: number; load: number; bess: number; hotspot: number }>
-  >([{ tick: 1, freq: 50.0, load: 69.6, bess: -25.0, hotspot: 66.4 }]);
-  const [activeTab, setActiveTab] = useState<
-    'SLD_MATRIX' | 'TOPOLOGY' | 'DISPATCH_SYNC' | 'PROTOCOL_SQL'
-  >('SLD_MATRIX');
+  const [history, setHistory] = useState<Array<{ freq: number; load: number }>>([
+    { freq: 50.0, load: 69.6 },
+  ]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'topology' | 'dispatch' | 'protocol'>(
+    'overview'
+  );
   const [selectedNodeId, setSelectedNodeId] = useState<string>('TR-NRB-04');
 
-  const wsRef = useRef<WebSocket | null>(null);
   const localSimRef = useRef({
     scenario: 'NOMINAL',
     autoBalancer: true,
@@ -382,50 +379,24 @@ export default function App() {
     let ws: WebSocket | null = null;
     try {
       ws = new WebSocket('ws://localhost:8000/ws');
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setBackendConnected(true);
-      };
-
+      ws.onopen = () => setBackendConnected(true);
       ws.onmessage = (event) => {
         try {
           const data: TelemetrySnapshot = JSON.parse(event.data);
           setSnapshot(data);
-          const hs =
-            data.metrics.winding_hotspot_c ??
-            Number(
-              (
-                data.metrics.transformer_temp_c +
-                22.0 * Math.pow(data.metrics.transformer_load_pct / 100.0, 1.6)
-              ).toFixed(1)
-            );
           setHistory((prev) => [
-            ...prev.slice(-39),
-            {
-              tick: data.tick,
-              freq: data.metrics.frequency_hz,
-              load: data.metrics.transformer_load_pct,
-              bess: data.metrics.bess_dispatch_kw,
-              hotspot: hs,
-            },
+            ...prev.slice(-29),
+            { freq: data.metrics.frequency_hz, load: data.metrics.transformer_load_pct },
           ]);
         } catch {
-          // ignore malformed frame
+          // ignore
         }
       };
-
-      ws.onclose = () => {
-        setBackendConnected(false);
-      };
-
-      ws.onerror = () => {
-        setBackendConnected(false);
-      };
+      ws.onclose = () => setBackendConnected(false);
+      ws.onerror = () => setBackendConnected(false);
     } catch {
       setBackendConnected(false);
     }
-
     return () => {
       if (ws) ws.close();
     };
@@ -457,10 +428,10 @@ export default function App() {
           baseComm = 250.0;
         }
 
-        const geo = baseGeo > 0 ? Math.max(0, baseGeo + (Math.random() * 5 - 2.5)) : 0;
-        const sol = Math.max(0, baseSol + (Math.random() * 5 - 2.5));
-        const clinic = baseClinic + (Math.random() * 2.4 - 1.2);
-        const rawComm = baseComm + (Math.random() * 6 - 3);
+        const geo = baseGeo > 0 ? Math.max(0, baseGeo + (Math.random() * 4 - 2)) : 0;
+        const sol = Math.max(0, baseSol + (Math.random() * 4 - 2));
+        const clinic = baseClinic + (Math.random() * 2 - 1);
+        const rawComm = baseComm + (Math.random() * 5 - 2.5);
 
         const unmitigated = clinic + rawComm;
         const availGen = geo + sol;
@@ -478,7 +449,7 @@ export default function App() {
             const effComm = rawComm * curtailment;
             bessKw = Math.min(250.0, Math.max(0, clinic + effComm - sol));
             if (sim.state !== 'FAULT_ISLANDING') {
-              actionMsg = `52-PCC Breaker Opened: Islanded on Solar + BESS (${bessKw.toFixed(1)} kW). Clinic 100% protected; SME load curtailed to 55%.`;
+              actionMsg = `Upstream grid lost. Islanded on solar + battery (${bessKw.toFixed(0)} kW); commercial load curtailed to 55%.`;
             }
           } else if (sim.strategy === 'AGGRESSIVE_PEAK_SHAVING') {
             const cap = ratedKva * 0.68;
@@ -490,7 +461,7 @@ export default function App() {
               newState = 'STABLE';
             }
             if (sim.state !== newState) {
-              actionMsg = `[AGGRESSIVE_PEAK_SHAVING] Capping TR-NRB-04 at 68% rating via BESS (${bessKw.toFixed(1)} kW).`;
+              actionMsg = `Peak shaving active: capping transformer load at 68% with ${bessKw.toFixed(0)} kW battery support.`;
             }
           } else if (sim.strategy === 'CONSERVATIVE_CLINIC_RESERVE') {
             const projLoad = (unmitigated / ratedKva) * 100.0;
@@ -504,7 +475,7 @@ export default function App() {
               newState = 'STABLE';
             }
             if (sim.state !== newState) {
-              actionMsg = `[CONSERVATIVE_CLINIC_RESERVE] Preserving LFP reserve for clinic islanding; SME load factor=${Math.round(curtailment * 100)}%.`;
+              actionMsg = `Clinic reserve mode: commercial load curtailed to ${Math.round(curtailment * 100)}% to preserve battery.`;
             }
           } else {
             const projLoad = (unmitigated / ratedKva) * 100.0;
@@ -517,20 +488,19 @@ export default function App() {
                 curtailment = 0.72;
                 newState = 'DEMAND_RESPONSE_SHED';
                 if (sim.state !== 'DEMAND_RESPONSE_SHED') {
-                  actionMsg = `[PROPORTIONAL_DROOP] Dispatched BESS (${bessKw.toFixed(1)} kW) + Demand-Response: curtailed SME load by 28%.`;
+                  actionMsg = `Dispatched ${bessKw.toFixed(0)} kW from battery and curtailed commercial demand by 28%.`;
                 }
               } else {
                 newState = 'BESS_DISPATCH_ACTIVE';
                 if (sim.state !== 'BESS_DISPATCH_ACTIVE') {
-                  actionMsg = `[PROPORTIONAL_DROOP] Automated Peak Shaving: BESS injecting ${bessKw.toFixed(1)} kW to relieve TR-NRB-04.`;
+                  actionMsg = `Battery injecting ${bessKw.toFixed(0)} kW to relieve transformer overload.`;
                 }
               }
             } else {
               newState = 'STABLE';
               bessKw = sim.soc < 94 ? -25.0 : 0.0;
               if (sim.state !== 'STABLE') {
-                actionMsg =
-                  'Corridor telemetry returned to 50.00 Hz nominal band. Restored 100% SME feeder allocation.';
+                actionMsg = 'Returned to nominal 50.00 Hz operation.';
               }
             }
           }
@@ -540,8 +510,7 @@ export default function App() {
           if (geo === 0 || (unmitigated / ratedKva) * 100.0 > 88.0) {
             newState = 'CRITICAL_OVERLOAD_UNPROTECTED';
             if (sim.state !== 'CRITICAL_OVERLOAD_UNPROTECTED') {
-              actionMsg =
-                'PROTECTION BYPASSED: TR-NRB-04 exceeding thermal rating; bus frequency collapsing below 49.20 Hz trip limit.';
+              actionMsg = 'Auto-protection disabled: transformer overloaded and frequency sagging.';
             }
           } else {
             newState = 'STABLE';
@@ -559,21 +528,14 @@ export default function App() {
         const targetTemp = 34.0 + Math.pow(trLoadPct / 100.0, 1.7) * 52.0;
         sim.temp = sim.temp * 0.82 + targetTemp * 0.18;
 
-        const loadRatioK = trLoadPct / 100.0;
-        const windingHotspotC = sim.temp + 22.0 * Math.pow(loadRatioK, 1.6);
-        const thermalAgingFactor = Math.exp(15000.0 / 383.0 - 15000.0 / (windingHotspotC + 273.0));
-        const baselineForecastKw = sim.scenario === 'NOMINAL' ? 348.0 : 365.0;
-        const forecastErrorPct = ((unmitigated - baselineForecastKw) / baselineForecastKw) * 100.0;
-        const corridorLossesKw = Number((4.2 + Math.pow(loadRatioK, 2) * 14.5).toFixed(1));
-
         let freq = 50.0;
         let volt = 240.0;
         if (newState === 'CRITICAL_OVERLOAD_UNPROTECTED') {
-          freq = 49.12 + (Math.random() * 0.08 - 0.04);
-          volt = 204.5 + (Math.random() * 3 - 1.5);
+          freq = 49.12 + (Math.random() * 0.06 - 0.03);
+          volt = 205.0 + (Math.random() * 2 - 1);
         } else if (newState === 'FAULT_ISLANDING') {
           freq = 49.89 + (Math.random() * 0.04 - 0.02);
-          volt = 236.8 + (Math.random() * 1.4 - 0.7);
+          volt = 237.0 + (Math.random() * 1 - 0.5);
         } else {
           const bal = geo + sol + bessKw - totalDemand;
           freq = 50.0 + Math.max(-0.5, Math.min(0.25, (bal / 500.0) * 0.35));
@@ -583,7 +545,7 @@ export default function App() {
         const updatedNodes: GridNode[] = [
           {
             node_id: 'GEN-OLK-01',
-            node_name: 'Olkaria Geothermal Feeder',
+            node_name: 'Olkaria Geothermal',
             node_type: 'GENERATION',
             region: 'Rift Valley',
             rated_capacity_kw: 450.0,
@@ -592,11 +554,11 @@ export default function App() {
             voltage_v: geo > 0 ? Number(volt.toFixed(1)) : 0.0,
             frequency_hz: geo > 0 ? Number(freq.toFixed(2)) : 0.0,
             temperature_c: 42.5,
-            status: geo === 0 ? 'OFFLINE_FAULT' : 'ONLINE',
+            status: geo === 0 ? 'OFFLINE' : 'ONLINE',
           },
           {
             node_id: 'GEN-SOL-02',
-            node_name: 'Nakuru Solar PV Array',
+            node_name: 'Nakuru Solar Array',
             node_type: 'GENERATION',
             region: 'Rift Valley',
             rated_capacity_kw: 280.0,
@@ -609,7 +571,7 @@ export default function App() {
           },
           {
             node_id: 'TR-NRB-04',
-            node_name: 'Kasarani 500kVA Step-Down',
+            node_name: 'Kasarani 500kVA Transformer',
             node_type: 'TRANSFORMER',
             region: 'Nairobi North',
             rated_capacity_kw: 500.0,
@@ -618,16 +580,11 @@ export default function App() {
             voltage_v: Number(volt.toFixed(1)),
             frequency_hz: Number(freq.toFixed(2)),
             temperature_c: Number(sim.temp.toFixed(1)),
-            status:
-              trLoadPct > 90
-                ? 'CRITICAL_OVERLOAD'
-                : trLoadPct > 78
-                ? 'HIGH_LOAD_GUARD'
-                : 'NOMINAL',
+            status: trLoadPct > 90 ? 'OVERLOAD' : trLoadPct > 78 ? 'HIGH_LOAD' : 'NOMINAL',
           },
           {
             node_id: 'BESS-KSM-01',
-            node_name: 'GridPulse LFP Storage (400kWh)',
+            node_name: 'LFP Battery Bank (400kWh)',
             node_type: 'STORAGE',
             region: 'Nairobi North',
             rated_capacity_kw: 250.0,
@@ -636,12 +593,7 @@ export default function App() {
             voltage_v: Number(volt.toFixed(1)),
             frequency_hz: Number(freq.toFixed(2)),
             temperature_c: Number((29.5 + (Math.abs(bessKw) / 250.0) * 11.0).toFixed(1)),
-            status:
-              bessKw > 0
-                ? 'DISCHARGING_SUPPORT'
-                : bessKw < 0
-                ? 'CHARGING_SURPLUS'
-                : 'STANDBY_IDLE',
+            status: bessKw > 0 ? 'DISCHARGING' : bessKw < 0 ? 'CHARGING' : 'STANDBY',
           },
           {
             node_id: 'LOAD-HOSP-01',
@@ -654,11 +606,11 @@ export default function App() {
             voltage_v: Number(volt.toFixed(1)),
             frequency_hz: Number(freq.toFixed(2)),
             temperature_c: 26.0,
-            status: 'PROTECTED_PRIORITY_1',
+            status: 'PROTECTED',
           },
           {
             node_id: 'LOAD-COMM-02',
-            node_name: 'SME Cold-Storage & Agro Hub',
+            node_name: 'Agro-Processing Hub',
             node_type: 'LOAD_FLEXIBLE',
             region: 'Nairobi North',
             rated_capacity_kw: 320.0,
@@ -667,10 +619,7 @@ export default function App() {
             voltage_v: Number(volt.toFixed(1)),
             frequency_hz: Number(freq.toFixed(2)),
             temperature_c: 28.0,
-            status:
-              curtailment < 1.0
-                ? `CURTAILED_${Math.round((1 - curtailment) * 100)}PCT`
-                : 'NOMINAL',
+            status: curtailment < 1.0 ? `CURTAILED (-${Math.round((1 - curtailment) * 100)}%)` : 'NOMINAL',
           },
         ];
 
@@ -678,7 +627,7 @@ export default function App() {
         if (actionMsg) {
           events.unshift({
             event_id: events.length + 1,
-            idempotency_key: `EVT-${sim.tick}-${Math.random().toString(16).slice(2, 8).toUpperCase()}`,
+            idempotency_key: `EVT-${String(sim.tick).padStart(4, '0')}`,
             timestamp_utc: new Date().toISOString(),
             trigger_node_id: geo === 0 ? 'GEN-OLK-01' : 'TR-NRB-04',
             previous_state: prev.system_state,
@@ -693,18 +642,8 @@ export default function App() {
         const nextFreq = Number(freq.toFixed(2));
         const nextLoad = Number(trLoadPct.toFixed(1));
         const nextBess = Number(bessKw.toFixed(1));
-        const nextHotspot = Number(windingHotspotC.toFixed(1));
 
-        setHistory((h) => [
-          ...h.slice(-39),
-          {
-            tick: sim.tick,
-            freq: nextFreq,
-            load: nextLoad,
-            bess: nextBess,
-            hotspot: nextHotspot,
-          },
-        ]);
+        setHistory((h) => [...h.slice(-29), { freq: nextFreq, load: nextLoad }]);
 
         return {
           timestamp_utc: new Date().toISOString(),
@@ -720,18 +659,12 @@ export default function App() {
             total_demand_kw: Number(totalDemand.toFixed(1)),
             transformer_load_pct: nextLoad,
             transformer_temp_c: Number(sim.temp.toFixed(1)),
-            winding_hotspot_c: nextHotspot,
-            thermal_aging_factor: Number(thermalAgingFactor.toFixed(3)),
-            forecast_demand_kw: baselineForecastKw,
-            forecast_error_pct: Number(forecastErrorPct.toFixed(1)),
-            corridor_losses_kw: corridorLossesKw,
-            pcc_breaker_closed: geo > 0,
             bess_soc_pct: Number(sim.soc.toFixed(1)),
             bess_dispatch_kw: nextBess,
             clinic_uptime_pct: 100.0,
           },
           nodes: updatedNodes,
-          recent_events: events.slice(0, 12),
+          recent_events: events.slice(0, 8),
           subsystems: buildFallbackSubsystems(
             updatedNodes,
             sim.tick,
@@ -758,7 +691,7 @@ export default function App() {
           body: JSON.stringify({ scenario: scenarioId }),
         });
       } catch {
-        // fallback handled locally
+        // fallback
       }
     }
   };
@@ -795,42 +728,13 @@ export default function App() {
   };
 
   const { metrics, system_state, active_scenario, auto_balancer_enabled, subsystems } = snapshot;
-
-  const windingHotspot =
-    metrics.winding_hotspot_c ??
-    Number(
-      (
-        metrics.transformer_temp_c +
-        22.0 * Math.pow(metrics.transformer_load_pct / 100.0, 1.6)
-      ).toFixed(1)
-    );
-  const agingFactor =
-    metrics.thermal_aging_factor ??
-    Number(Math.exp(15000.0 / 383.0 - 15000.0 / (windingHotspot + 273.0)).toFixed(3));
-  const forecastKw = metrics.forecast_demand_kw ?? 348.0;
-  const forecastErr =
-    metrics.forecast_error_pct ??
-    Number((((metrics.total_demand_kw - forecastKw) / forecastKw) * 100).toFixed(1));
-  const lossesKw =
-    metrics.corridor_losses_kw ??
-    Number((4.2 + Math.pow(metrics.transformer_load_pct / 100.0, 2) * 14.5).toFixed(1));
-  const pccClosed =
-    metrics.pcc_breaker_closed ??
-    (snapshot.nodes.find((n) => n.node_id === 'GEN-OLK-01')?.active_power_kw ?? 0) > 0;
-
-  const selectedNode =
-    snapshot.nodes.find((n) => n.node_id === selectedNodeId) ?? snapshot.nodes[2];
-  const selectedRtuFrame = subsystems?.rtu_frames.find(
-    (f) => f.node_id === selectedNode.node_id
-  );
-
   const hospitalRoute = subsystems?.network_routing.hospital_route.path ?? [
     'GEN-OLK-01',
     'TR-NRB-04',
     'LOAD-HOSP-01',
   ];
 
-  const isEdgeOnRoute = (a: string, b: string) => {
+  const isOnHospitalRoute = (a: string, b: string) => {
     for (let i = 0; i < hospitalRoute.length - 1; i++) {
       if (
         (hospitalRoute[i] === a && hospitalRoute[i + 1] === b) ||
@@ -842,62 +746,66 @@ export default function App() {
     return false;
   };
 
-  const stateColorText = (state: string) => {
-    if (state === 'STABLE') return 'text-[#3fb950]';
-    if (state === 'BESS_DISPATCH_ACTIVE') return 'text-[#58a6ff]';
-    if (state === 'DEMAND_RESPONSE_SHED') return 'text-[#d29922]';
-    return 'text-[#f85149]';
-  };
-
-  const stateDotColor = (state: string) => {
-    if (state === 'STABLE') return 'bg-[#3fb950]';
-    if (state === 'BESS_DISPATCH_ACTIVE') return 'bg-[#58a6ff]';
-    if (state === 'DEMAND_RESPONSE_SHED') return 'bg-[#d29922]';
-    return 'bg-[#f85149]';
-  };
-
-  const nodeById = (id: string) => snapshot.nodes.find((n) => n.node_id === id);
+  const selectedNode =
+    snapshot.nodes.find((n) => n.node_id === selectedNodeId) ?? snapshot.nodes[2];
 
   return (
-    <div className="min-h-screen bg-[#0a0c10] text-[#e6edf3] flex flex-col select-none">
-      {/* TOP SCADA COMMAND BAR */}
-      <header className="h-11 border-b border-[#1e2430] bg-[#0d1017] px-4 flex items-center justify-between text-xs">
-        <div className="flex items-center divide-x divide-[#1e2430]">
-          <div className="pr-3 flex items-center gap-2">
-            <span className="inline-block w-2 h-2 bg-[#3fb950]" />
-            <span className="font-mono font-bold tracking-wider text-[#f0f6fc]">GRIDPULSE</span>
-            <span className="font-mono text-[10px] text-[#8b949e]">v2.4</span>
-          </div>
-          <div className="px-3 font-mono text-[11px] text-[#8b949e] hidden sm:block">
-            FEEDER: <span className="text-[#e6edf3]">KE-RIFT-NRB-04 (11kV/240V)</span>
-          </div>
-          <div className="px-3 font-mono text-[11px] text-[#8b949e] hidden md:block">
-            LINK:{' '}
-            <span className={backendConnected ? 'text-[#3fb950]' : 'text-[#d29922]'}>
-              {backendConnected ? 'WS://127.0.0.1:8000 [SQLITE-WAL]' : 'LOCAL-TWIN-FALLBACK'}
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 antialiased">
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        {/* HEADER */}
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-zinc-800/80">
+          <div className="flex items-center gap-3">
+            <span className="text-base font-medium tracking-tight text-zinc-100">GridPulse</span>
+            <span className="text-zinc-700">/</span>
+            <span className="text-xs text-zinc-400">Nairobi North Distribution Corridor</span>
+            <span className="inline-flex items-center gap-1.5 ml-2 text-[11px] font-mono text-zinc-500">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  backendConnected ? 'bg-emerald-500' : 'bg-zinc-500'
+                }`}
+              />
+              {backendConnected ? 'Live' : 'Simulated'}
             </span>
           </div>
-          <div className="px-3 font-mono text-[11px] text-[#8b949e] hidden lg:block">
-            CYCLE: <span className="text-[#e6edf3] tabular-nums">#{String(snapshot.tick).padStart(5, '0')}</span>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex items-center border border-[#1e2430] bg-[#0a0c10]">
+          <nav className="flex items-center gap-6 text-xs">
+            {(
+              [
+                ['overview', 'Overview'],
+                ['topology', 'Topology'],
+                ['dispatch', 'Dispatch'],
+                ['protocol', 'Protocol'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`py-1 transition-colors ${
+                  activeTab === id
+                    ? 'text-zinc-100 font-medium border-b border-zinc-100'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        </header>
+
+        {/* SCENARIO & PROTECTION BAR */}
+        <section className="flex flex-wrap items-center justify-between gap-4 py-5 border-b border-zinc-800/60 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="text-zinc-500 mr-2">Condition</span>
             {SCENARIOS.map((scn) => {
               const active = active_scenario === scn.id;
               return (
                 <button
                   key={scn.id}
                   onClick={() => triggerScenario(scn.id)}
-                  className={`px-2.5 py-1 font-mono text-[10px] tracking-tight transition-colors border-r last:border-r-0 border-[#1e2430] ${
+                  className={`px-3 py-1.5 rounded transition-colors ${
                     active
-                      ? scn.id === 'UPSTREAM_BLACKOUT'
-                        ? 'bg-[#f85149]/20 text-[#f85149] font-semibold'
-                        : scn.id === 'NOMINAL'
-                        ? 'bg-[#3fb950]/15 text-[#3fb950] font-semibold'
-                        : 'bg-[#d29922]/20 text-[#d29922] font-semibold'
-                      : 'text-[#8b949e] hover:text-[#e6edf3] hover:bg-[#161b22]'
+                      ? 'bg-zinc-100 text-zinc-950 font-medium'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
                   }`}
                 >
                   {scn.label}
@@ -908,963 +816,455 @@ export default function App() {
 
           <button
             onClick={toggleAutoBalancer}
-            className={`px-2.5 py-1 font-mono text-[10px] border transition-colors ${
-              auto_balancer_enabled
-                ? 'border-[#2ea043] bg-[#2ea043]/15 text-[#3fb950]'
-                : 'border-[#f85149] bg-[#f85149]/15 text-[#f85149]'
-            }`}
+            className="flex items-center gap-2.5 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
-            AUTO-PROTECT: {auto_balancer_enabled ? 'ARMED' : 'BYPASSED'}
-          </button>
-        </div>
-      </header>
-
-      {/* 8-CELL HAIRLINE TELEMETRY RIBBON */}
-      <section className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 divide-x divide-y lg:divide-y-0 divide-[#1e2430] border-b border-[#1e2430] bg-[#0d1017]">
-        <div className="p-2.5">
-          <div className="flex items-center justify-between text-[10px] font-mono text-[#8b949e]">
-            <span>BUS FREQUENCY</span>
-            <span>NOM 50.00</span>
-          </div>
-          <div
-            className={`mt-1 font-mono text-lg font-semibold tabular-nums ${
-              metrics.frequency_hz < 49.5 ? 'text-[#f85149]' : 'text-[#f0f6fc]'
-            }`}
-          >
-            {metrics.frequency_hz.toFixed(2)} <span className="text-xs font-normal text-[#8b949e]">Hz</span>
-          </div>
-          <div className="mt-0.5 font-mono text-[10px] text-[#8b949e] tabular-nums">
-            DEV: {(metrics.frequency_hz - 50.0 >= 0 ? '+' : '') + (metrics.frequency_hz - 50.0).toFixed(2)} Hz
-          </div>
-        </div>
-
-        <div className="p-2.5">
-          <div className="flex items-center justify-between text-[10px] font-mono text-[#8b949e]">
-            <span>SECONDARY BUS</span>
-            <span>52-PCC: {pccClosed ? 'CLSD' : 'OPEN'}</span>
-          </div>
-          <div className="mt-1 font-mono text-lg font-semibold text-[#f0f6fc] tabular-nums">
-            {metrics.bus_voltage_v.toFixed(1)} <span className="text-xs font-normal text-[#8b949e]">V</span>
-          </div>
-          <div className="mt-0.5 font-mono text-[10px] text-[#8b949e] tabular-nums">
-            PU: {(metrics.bus_voltage_v / 240.0).toFixed(3)} pu
-          </div>
-        </div>
-
-        <div className="p-2.5">
-          <div className="flex items-center justify-between text-[10px] font-mono text-[#8b949e]">
-            <span>GENERATION</span>
-            <span>GEO + PV</span>
-          </div>
-          <div className="mt-1 font-mono text-lg font-semibold text-[#f0f6fc] tabular-nums">
-            {metrics.total_generation_kw.toFixed(1)} <span className="text-xs font-normal text-[#8b949e]">kW</span>
-          </div>
-          <div className="mt-0.5 font-mono text-[10px] text-[#8b949e] tabular-nums">
-            LOSS (I²R): {lossesKw.toFixed(1)} kW
-          </div>
-        </div>
-
-        <div className="p-2.5">
-          <div className="flex items-center justify-between text-[10px] font-mono text-[#8b949e]">
-            <span>CORRIDOR DEMAND</span>
-            <span>FCST {forecastKw.toFixed(0)}</span>
-          </div>
-          <div className="mt-1 font-mono text-lg font-semibold text-[#f0f6fc] tabular-nums">
-            {metrics.total_demand_kw.toFixed(1)} <span className="text-xs font-normal text-[#8b949e]">kW</span>
-          </div>
-          <div
-            className={`mt-0.5 font-mono text-[10px] tabular-nums ${
-              Math.abs(forecastErr) > 15 ? 'text-[#d29922]' : 'text-[#8b949e]'
-            }`}
-          >
-            ERR: {(forecastErr >= 0 ? '+' : '') + forecastErr.toFixed(1)}%
-          </div>
-        </div>
-
-        <div className="p-2.5">
-          <div className="flex items-center justify-between text-[10px] font-mono text-[#8b949e]">
-            <span>TR-NRB-04 LOAD</span>
-            <span>500 kVA</span>
-          </div>
-          <div
-            className={`mt-1 font-mono text-lg font-semibold tabular-nums ${
-              metrics.transformer_load_pct > 88
-                ? 'text-[#f85149]'
-                : metrics.transformer_load_pct > 78
-                ? 'text-[#d29922]'
-                : 'text-[#f0f6fc]'
-            }`}
-          >
-            {metrics.transformer_load_pct.toFixed(1)} <span className="text-xs font-normal text-[#8b949e]">%</span>
-          </div>
-          <div className="mt-0.5 font-mono text-[10px] text-[#8b949e] tabular-nums">
-            TOP OIL: {metrics.transformer_temp_c.toFixed(1)} °C
-          </div>
-        </div>
-
-        <div className="p-2.5">
-          <div className="flex items-center justify-between text-[10px] font-mono text-[#8b949e]">
-            <span>IEC 60076-7 HOTSPOT</span>
-            <span>THERMAL</span>
-          </div>
-          <div
-            className={`mt-1 font-mono text-lg font-semibold tabular-nums ${
-              windingHotspot > 95 ? 'text-[#f85149]' : windingHotspot > 80 ? 'text-[#d29922]' : 'text-[#f0f6fc]'
-            }`}
-          >
-            {windingHotspot.toFixed(1)} <span className="text-xs font-normal text-[#8b949e]">°C</span>
-          </div>
-          <div className="mt-0.5 font-mono text-[10px] text-[#8b949e] tabular-nums">
-            AGING F_AA: {agingFactor.toFixed(3)}x
-          </div>
-        </div>
-
-        <div className="p-2.5">
-          <div className="flex items-center justify-between text-[10px] font-mono text-[#8b949e]">
-            <span>BESS-KSM-01 PCS</span>
-            <span>SOC {metrics.bess_soc_pct.toFixed(1)}%</span>
-          </div>
-          <div
-            className={`mt-1 font-mono text-lg font-semibold tabular-nums ${
-              metrics.bess_dispatch_kw > 0
-                ? 'text-[#58a6ff]'
-                : metrics.bess_dispatch_kw < 0
-                ? 'text-[#3fb950]'
-                : 'text-[#f0f6fc]'
-            }`}
-          >
-            {(metrics.bess_dispatch_kw > 0 ? '+' : '') + metrics.bess_dispatch_kw.toFixed(1)}{' '}
-            <span className="text-xs font-normal text-[#8b949e]">kW</span>
-          </div>
-          <div className="mt-0.5 font-mono text-[10px] text-[#8b949e] tabular-nums">
-            {metrics.bess_dispatch_kw > 0
-              ? 'INJECTING PEAK SUPPORT'
-              : metrics.bess_dispatch_kw < 0
-              ? 'ABSORBING PV SURPLUS'
-              : 'STANDBY'}
-          </div>
-        </div>
-
-        <div className="p-2.5">
-          <div className="flex items-center justify-between text-[10px] font-mono text-[#8b949e]">
-            <span>PROTECTION FSM</span>
-            <span>CLINIC 100%</span>
-          </div>
-          <div className="mt-1 flex items-center gap-1.5">
-            <span className={`inline-block w-2 h-2 ${stateDotColor(system_state)}`} />
-            <span className={`font-mono text-xs font-bold tracking-tight truncate ${stateColorText(system_state)}`}>
-              {system_state}
-            </span>
-          </div>
-          <div className="mt-1 font-mono text-[10px] text-[#8b949e]">
-            INTERLOCK:{' '}
+            <span>Auto-protection</span>
             <span
-              className={
-                subsystems?.safety_interlock.invariant_satisfied ? 'text-[#3fb950]' : 'text-[#f85149]'
-              }
+              className={`px-2 py-0.5 rounded text-[11px] font-mono ${
+                auto_balancer_enabled
+                  ? 'bg-emerald-500/10 text-emerald-400'
+                  : 'bg-rose-500/10 text-rose-400'
+              }`}
             >
-              {subsystems?.safety_interlock.invariant_satisfied ? 'PHI_SAFE VALID' : 'TRIP REQ'}
+              {auto_balancer_enabled ? 'On' : 'Off'}
             </span>
+          </button>
+        </section>
+
+        {/* 4 KEY METRICS */}
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-8 py-8 border-b border-zinc-800/60">
+          <div>
+            <div className="text-xs text-zinc-500">Grid frequency</div>
+            <div
+              className={`mt-2 text-2xl font-mono font-normal tracking-tight tabular-nums ${
+                metrics.frequency_hz < 49.5 ? 'text-rose-400' : 'text-zinc-100'
+              }`}
+            >
+              {metrics.frequency_hz.toFixed(2)} <span className="text-sm text-zinc-500">Hz</span>
+            </div>
+            <div className="mt-1 text-xs font-mono text-zinc-500 tabular-nums">
+              {metrics.bus_voltage_v.toFixed(1)} V bus
+            </div>
           </div>
-        </div>
-      </section>
 
-      {/* SUB-VIEW NAVIGATION BAR */}
-      <nav className="h-9 border-b border-[#1e2430] bg-[#0a0c10] px-4 flex items-center justify-between text-xs font-mono">
-        <div className="flex items-center h-full">
-          {[
-            { id: 'SLD_MATRIX', label: '01 // SLD & ASSET MATRIX' },
-            { id: 'TOPOLOGY', label: '02 // NETWORK TOPOLOGY & IMPEDANCE' },
-            { id: 'DISPATCH_SYNC', label: '03 // DISPATCH LAWS & RING BUFFER' },
-            { id: 'PROTOCOL_SQL', label: '04 // 64-BIT RTU FRAMES, INTERLOCK & SQL' },
-          ].map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`h-full px-4 border-r border-[#1e2430] text-[11px] tracking-tight transition-colors ${
-                  active
-                    ? 'bg-[#161b22] text-[#f0f6fc] font-semibold border-b-2 border-b-[#58a6ff]'
-                    : 'text-[#8b949e] hover:text-[#e6edf3] hover:bg-[#0d1017]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="hidden xl:flex items-center gap-4 text-[11px] text-[#8b949e]">
-          <span>
-            ACTIVE LAW:{' '}
-            <strong className="text-[#e6edf3]">
-              {subsystems?.dispatch_architecture.active_strategy ?? snapshot.active_strategy}
-            </strong>
-          </span>
-          <span>
-            HOSPITAL ROUTE:{' '}
-            <strong className="text-[#3fb950]">{hospitalRoute.join(' -> ')}</strong>
-          </span>
-        </div>
-      </nav>
+          <div>
+            <div className="text-xs text-zinc-500">Transformer load</div>
+            <div
+              className={`mt-2 text-2xl font-mono font-normal tracking-tight tabular-nums ${
+                metrics.transformer_load_pct > 88
+                  ? 'text-rose-400'
+                  : metrics.transformer_load_pct > 78
+                  ? 'text-amber-400'
+                  : 'text-zinc-100'
+              }`}
+            >
+              {metrics.transformer_load_pct.toFixed(1)}
+              <span className="text-sm text-zinc-500">%</span>
+            </div>
+            <div className="mt-1 text-xs font-mono text-zinc-500 tabular-nums">
+              {metrics.transformer_temp_c.toFixed(1)} °C oil
+            </div>
+          </div>
 
-      {/* MAIN WORKBENCH CONTENT */}
-      <main className="flex-1 flex flex-col">
-        {activeTab === 'SLD_MATRIX' && (
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#1e2430]">
-            {/* LEFT 8 COLUMNS: INTERACTIVE SINGLE-LINE DIAGRAM + ASSET TELEMETRY MATRIX */}
-            <div className="lg:col-span-8 flex flex-col divide-y divide-[#1e2430]">
-              {/* INTERACTIVE IEEE SINGLE-LINE DIAGRAM (SLD) */}
-              <div className="p-3 bg-[#0a0c10]">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2 font-mono text-[11px]">
-                    <span className="text-[#8b949e] uppercase">
-                      SINGLE-LINE SCHEMATIC // CLICK ANY ASSET NODE TO INSPECT REGISTERS
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 font-mono text-[10px] text-[#8b949e]">
-                    <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-3 h-0.5 bg-[#3fb950]" /> DIJKSTRA HOSPITAL ROUTE
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="inline-block w-3 h-0.5 bg-[#30363d]" /> SECONDARY FEEDER
-                    </span>
-                  </div>
+          <div>
+            <div className="text-xs text-zinc-500">Battery storage</div>
+            <div className="mt-2 text-2xl font-mono font-normal tracking-tight text-zinc-100 tabular-nums">
+              {metrics.bess_soc_pct.toFixed(1)}
+              <span className="text-sm text-zinc-500">%</span>
+            </div>
+            <div className="mt-1 text-xs font-mono text-zinc-500 tabular-nums">
+              {(metrics.bess_dispatch_kw > 0 ? '+' : '') + metrics.bess_dispatch_kw.toFixed(1)} kW
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs text-zinc-500">System state</div>
+            <div className="mt-2 text-lg font-medium tracking-tight text-zinc-100">
+              {formatStateLabel(system_state)}
+            </div>
+            <div className="mt-1 text-xs text-zinc-500">
+              Clinic uptime {metrics.clinic_uptime_pct.toFixed(0)}%
+            </div>
+          </div>
+        </section>
+
+        {/* TAB 1: OVERVIEW */}
+        {activeTab === 'overview' && (
+          <div className="py-8 space-y-12">
+            {/* MINIMALIST SINGLE-LINE SCHEMATIC */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs font-medium text-zinc-400">Corridor power flow</h2>
+                <span className="text-xs font-mono text-zinc-500">
+                  Priority route: {hospitalRoute.join(' → ')}
+                </span>
+              </div>
+
+              <div className="border border-zinc-800/80 rounded-md p-6 bg-zinc-950/40">
+                <svg viewBox="0 0 800 210" className="w-full h-auto font-mono">
+                  {/* Connecting lines */}
+                  <line
+                    x1="170"
+                    y1="52"
+                    x2="310"
+                    y2="52"
+                    stroke={isOnHospitalRoute('GEN-OLK-01', 'TR-NRB-04') ? '#e4e4e7' : '#27272a'}
+                    strokeWidth={isOnHospitalRoute('GEN-OLK-01', 'TR-NRB-04') ? '1.5' : '1'}
+                  />
+                  <line
+                    x1="170"
+                    y1="152"
+                    x2="310"
+                    y2="152"
+                    stroke={isOnHospitalRoute('GEN-SOL-02', 'BESS-KSM-01') ? '#e4e4e7' : '#27272a'}
+                    strokeWidth={isOnHospitalRoute('GEN-SOL-02', 'BESS-KSM-01') ? '1.5' : '1'}
+                  />
+                  <line
+                    x1="395"
+                    y1="82"
+                    x2="395"
+                    y2="122"
+                    stroke={isOnHospitalRoute('TR-NRB-04', 'BESS-KSM-01') ? '#e4e4e7' : '#27272a'}
+                    strokeWidth="1.2"
+                  />
+                  <line
+                    x1="480"
+                    y1="52"
+                    x2="620"
+                    y2="52"
+                    stroke={isOnHospitalRoute('TR-NRB-04', 'LOAD-HOSP-01') ? '#e4e4e7' : '#27272a'}
+                    strokeWidth={isOnHospitalRoute('TR-NRB-04', 'LOAD-HOSP-01') ? '1.5' : '1'}
+                  />
+                  <line
+                    x1="480"
+                    y1="145"
+                    x2="620"
+                    y2="62"
+                    stroke={isOnHospitalRoute('BESS-KSM-01', 'LOAD-HOSP-01') ? '#e4e4e7' : '#27272a'}
+                    strokeWidth={isOnHospitalRoute('BESS-KSM-01', 'LOAD-HOSP-01') ? '1.5' : '1'}
+                  />
+                  <line x1="480" y1="155" x2="620" y2="155" stroke="#27272a" strokeWidth="1" />
+
+                  {[
+                    { id: 'GEN-OLK-01', x: 10, y: 24 },
+                    { id: 'GEN-SOL-02', x: 10, y: 124 },
+                    { id: 'TR-NRB-04', x: 310, y: 24 },
+                    { id: 'BESS-KSM-01', x: 310, y: 124 },
+                    { id: 'LOAD-HOSP-01', x: 620, y: 24 },
+                    { id: 'LOAD-COMM-02', x: 620, y: 124 },
+                  ].map((pos) => {
+                    const node = snapshot.nodes.find((n) => n.node_id === pos.id)!;
+                    const selected = selectedNodeId === node.node_id;
+                    return (
+                      <g
+                        key={node.node_id}
+                        onClick={() => setSelectedNodeId(node.node_id)}
+                        className="cursor-pointer"
+                      >
+                        <rect
+                          x={pos.x}
+                          y={pos.y}
+                          width="165"
+                          height="56"
+                          rx="3"
+                          fill="#09090b"
+                          stroke={selected ? '#e4e4e7' : '#27272a'}
+                          strokeWidth={selected ? '1.5' : '1'}
+                        />
+                        <text x={pos.x + 12} y={pos.y + 22} fill="#a1a1aa" fontSize="10">
+                          {node.node_name}
+                        </text>
+                        <text
+                          x={pos.x + 12}
+                          y={pos.y + 42}
+                          fill="#f4f4f5"
+                          fontSize="12"
+                          fontWeight="500"
+                        >
+                          {node.active_power_kw.toFixed(1)} kW
+                        </text>
+                        <text
+                          x={pos.x + 153}
+                          y={pos.y + 42}
+                          fill="#71717a"
+                          fontSize="10"
+                          textAnchor="end"
+                        >
+                          {node.load_pct.toFixed(0)}%
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            </div>
+
+            {/* QUIET TREND SPARKLINE */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              <div>
+                <div className="flex justify-between text-xs text-zinc-500 mb-3">
+                  <span>Transformer load trend</span>
+                  <span className="font-mono text-zinc-300 tabular-nums">
+                    {metrics.transformer_load_pct.toFixed(1)}%
+                  </span>
                 </div>
-
-                <div className="border border-[#1e2430] bg-[#07090d] p-2">
-                  <svg viewBox="0 0 880 280" className="w-full h-auto font-mono">
-                    {/* 11kV PRIMARY BUSBAR */}
-                    <line x1="210" y1="30" x2="210" y2="250" stroke="#30363d" strokeWidth="3" />
-                    <text x="210" y="18" fill="#8b949e" fontSize="9" textAnchor="middle">
-                      11kV PRIMARY BUS
-                    </text>
-
-                    {/* 240V SECONDARY BUSBAR */}
-                    <line x1="600" y1="30" x2="600" y2="250" stroke="#30363d" strokeWidth="3" />
-                    <text x="600" y="18" fill="#8b949e" fontSize="9" textAnchor="middle">
-                      240V MICROGRID BUS
-                    </text>
-
-                    {/* FEEDER LINES */}
-                    {/* GEN-OLK-01 to TR-NRB-04 via 52-PCC */}
-                    <line
-                      x1="165"
-                      y1="75"
-                      x2="310"
-                      y2="95"
-                      stroke={
-                        !pccClosed
-                          ? '#f85149'
-                          : isEdgeOnRoute('GEN-OLK-01', 'TR-NRB-04')
-                          ? '#3fb950'
-                          : '#484f58'
-                      }
-                      strokeWidth={isEdgeOnRoute('GEN-OLK-01', 'TR-NRB-04') ? '2.2' : '1.4'}
-                      strokeDasharray={!pccClosed ? '4 3' : undefined}
+                <div className="h-16 border-b border-zinc-800/80 flex items-end">
+                  <svg viewBox="0 0 300 60" className="w-full h-full overflow-visible">
+                    <polyline
+                      fill="none"
+                      stroke="#e4e4e7"
+                      strokeWidth="1.25"
+                      points={history
+                        .map((pt, i) => {
+                          const x = (i / Math.max(1, history.length - 1)) * 300;
+                          const y = 60 - (Math.min(130, Math.max(0, pt.load)) / 130) * 55;
+                          return `${x.toFixed(1)},${y.toFixed(1)}`;
+                        })
+                        .join(' ')}
                     />
-                    {/* 52-PCC Breaker Symbol */}
-                    <rect
-                      x="228"
-                      y="76"
-                      width="14"
-                      height="14"
-                      fill={pccClosed ? '#2ea043' : '#0a0c10'}
-                      stroke={pccClosed ? '#3fb950' : '#f85149'}
-                      strokeWidth="1.5"
-                    />
-                    <text x="235" y="102" fill="#8b949e" fontSize="8" textAnchor="middle">
-                      52-PCC
-                    </text>
-
-                    {/* GEN-SOL-02 to TR-NRB-04 */}
-                    <line
-                      x1="165"
-                      y1="195"
-                      x2="310"
-                      y2="110"
-                      stroke={isEdgeOnRoute('GEN-SOL-02', 'TR-NRB-04') ? '#3fb950' : '#30363d'}
-                      strokeWidth="1.4"
-                    />
-
-                    {/* GEN-SOL-02 to BESS-KSM-01 DC-Coupled Tie */}
-                    <line
-                      x1="165"
-                      y1="205"
-                      x2="310"
-                      y2="205"
-                      stroke={isEdgeOnRoute('GEN-SOL-02', 'BESS-KSM-01') ? '#3fb950' : '#484f58'}
-                      strokeWidth={isEdgeOnRoute('GEN-SOL-02', 'BESS-KSM-01') ? '2.2' : '1.4'}
-                    />
-
-                    {/* TR-NRB-04 to BESS-KSM-01 */}
-                    <line
-                      x1="395"
-                      y1="130"
-                      x2="395"
-                      y2="170"
-                      stroke={isEdgeOnRoute('TR-NRB-04', 'BESS-KSM-01') ? '#3fb950' : '#58a6ff'}
-                      strokeWidth={isEdgeOnRoute('TR-NRB-04', 'BESS-KSM-01') ? '2.2' : '1.5'}
-                    />
-
-                    {/* TR-NRB-04 to LOAD-HOSP-01 */}
-                    <line
-                      x1="480"
-                      y1="95"
-                      x2="685"
-                      y2="75"
-                      stroke={isEdgeOnRoute('TR-NRB-04', 'LOAD-HOSP-01') ? '#3fb950' : '#484f58'}
-                      strokeWidth={isEdgeOnRoute('TR-NRB-04', 'LOAD-HOSP-01') ? '2.4' : '1.4'}
-                    />
-
-                    {/* BESS-KSM-01 to LOAD-HOSP-01 */}
-                    <line
-                      x1="480"
-                      y1="195"
-                      x2="685"
-                      y2="85"
-                      stroke={isEdgeOnRoute('BESS-KSM-01', 'LOAD-HOSP-01') ? '#3fb950' : '#30363d'}
-                      strokeWidth={isEdgeOnRoute('BESS-KSM-01', 'LOAD-HOSP-01') ? '2.4' : '1.4'}
-                    />
-
-                    {/* BESS-KSM-01 / Secondary Bus to LOAD-COMM-02 */}
-                    <line
-                      x1="480"
-                      y1="205"
-                      x2="685"
-                      y2="205"
-                      stroke="#484f58"
-                      strokeWidth="1.4"
-                    />
-
-                    {/* NODE 1: GEN-OLK-01 */}
-                    {(() => {
-                      const n = nodeById('GEN-OLK-01')!;
-                      const sel = selectedNodeId === n.node_id;
-                      return (
-                        <g
-                          onClick={() => setSelectedNodeId(n.node_id)}
-                          className="cursor-pointer"
-                        >
-                          <rect
-                            x="15"
-                            y="42"
-                            width="150"
-                            height="66"
-                            fill={sel ? '#161b22' : '#0d1017'}
-                            stroke={
-                              n.active_power_kw === 0
-                                ? '#f85149'
-                                : sel
-                                ? '#f0f6fc'
-                                : '#30363d'
-                            }
-                            strokeWidth={sel ? '1.8' : '1.2'}
-                          />
-                          <text x="25" y="58" fill="#f0f6fc" fontSize="10" fontWeight="700">
-                            GEN-OLK-01
-                          </text>
-                          <text x="25" y="72" fill="#8b949e" fontSize="9">
-                            Olkaria Geothermal
-                          </text>
-                          <text
-                            x="25"
-                            y="96"
-                            fill={n.active_power_kw === 0 ? '#f85149' : '#3fb950'}
-                            fontSize="11"
-                            fontWeight="700"
-                          >
-                            {n.active_power_kw.toFixed(1)} kW
-                          </text>
-                          <text x="155" y="96" fill="#8b949e" fontSize="9" textAnchor="end">
-                            {n.load_pct.toFixed(0)}%
-                          </text>
-                        </g>
-                      );
-                    })()}
-
-                    {/* NODE 2: GEN-SOL-02 */}
-                    {(() => {
-                      const n = nodeById('GEN-SOL-02')!;
-                      const sel = selectedNodeId === n.node_id;
-                      return (
-                        <g
-                          onClick={() => setSelectedNodeId(n.node_id)}
-                          className="cursor-pointer"
-                        >
-                          <rect
-                            x="15"
-                            y="170"
-                            width="150"
-                            height="66"
-                            fill={sel ? '#161b22' : '#0d1017'}
-                            stroke={sel ? '#f0f6fc' : '#30363d'}
-                            strokeWidth={sel ? '1.8' : '1.2'}
-                          />
-                          <text x="25" y="186" fill="#f0f6fc" fontSize="10" fontWeight="700">
-                            GEN-SOL-02
-                          </text>
-                          <text x="25" y="200" fill="#8b949e" fontSize="9">
-                            Nakuru Solar Array
-                          </text>
-                          <text x="25" y="224" fill="#d29922" fontSize="11" fontWeight="700">
-                            {n.active_power_kw.toFixed(1)} kW
-                          </text>
-                          <text x="155" y="224" fill="#8b949e" fontSize="9" textAnchor="end">
-                            {n.load_pct.toFixed(0)}%
-                          </text>
-                        </g>
-                      );
-                    })()}
-
-                    {/* NODE 3: TR-NRB-04 */}
-                    {(() => {
-                      const n = nodeById('TR-NRB-04')!;
-                      const sel = selectedNodeId === n.node_id;
-                      return (
-                        <g
-                          onClick={() => setSelectedNodeId(n.node_id)}
-                          className="cursor-pointer"
-                        >
-                          <rect
-                            x="310"
-                            y="60"
-                            width="170"
-                            height="70"
-                            fill={sel ? '#161b22' : '#0d1017'}
-                            stroke={
-                              n.load_pct > 88
-                                ? '#f85149'
-                                : n.load_pct > 78
-                                ? '#d29922'
-                                : sel
-                                ? '#f0f6fc'
-                                : '#30363d'
-                            }
-                            strokeWidth={sel ? '1.8' : '1.2'}
-                          />
-                          <text x="320" y="76" fill="#f0f6fc" fontSize="10" fontWeight="700">
-                            TR-NRB-04 (500kVA)
-                          </text>
-                          <text x="320" y="90" fill="#8b949e" fontSize="9">
-                            Oil: {n.temperature_c.toFixed(1)}°C | HS: {windingHotspot.toFixed(1)}°C
-                          </text>
-                          <text
-                            x="320"
-                            y="116"
-                            fill={n.load_pct > 85 ? '#f85149' : '#e6edf3'}
-                            fontSize="11"
-                            fontWeight="700"
-                          >
-                            {n.active_power_kw.toFixed(1)} kW
-                          </text>
-                          <text x="470" y="116" fill="#8b949e" fontSize="9" textAnchor="end">
-                            LOAD {n.load_pct.toFixed(1)}%
-                          </text>
-                        </g>
-                      );
-                    })()}
-
-                    {/* NODE 4: BESS-KSM-01 */}
-                    {(() => {
-                      const n = nodeById('BESS-KSM-01')!;
-                      const sel = selectedNodeId === n.node_id;
-                      return (
-                        <g
-                          onClick={() => setSelectedNodeId(n.node_id)}
-                          className="cursor-pointer"
-                        >
-                          <rect
-                            x="310"
-                            y="170"
-                            width="170"
-                            height="70"
-                            fill={sel ? '#161b22' : '#0d1017'}
-                            stroke={
-                              n.active_power_kw > 0
-                                ? '#58a6ff'
-                                : sel
-                                ? '#f0f6fc'
-                                : '#30363d'
-                            }
-                            strokeWidth={sel ? '1.8' : '1.2'}
-                          />
-                          <text x="320" y="186" fill="#f0f6fc" fontSize="10" fontWeight="700">
-                            BESS-KSM-01 (LFP)
-                          </text>
-                          <text x="320" y="200" fill="#8b949e" fontSize="9">
-                            SoC: {metrics.bess_soc_pct.toFixed(1)}% | 400kWh
-                          </text>
-                          <text
-                            x="320"
-                            y="226"
-                            fill={n.active_power_kw > 0 ? '#58a6ff' : '#3fb950'}
-                            fontSize="11"
-                            fontWeight="700"
-                          >
-                            {(n.active_power_kw > 0 ? '+' : '') + n.active_power_kw.toFixed(1)} kW
-                          </text>
-                          <text x="470" y="226" fill="#8b949e" fontSize="9" textAnchor="end">
-                            {n.active_power_kw > 0 ? 'DISCHG' : n.active_power_kw < 0 ? 'CHARGE' : 'IDLE'}
-                          </text>
-                        </g>
-                      );
-                    })()}
-
-                    {/* NODE 5: LOAD-HOSP-01 */}
-                    {(() => {
-                      const n = nodeById('LOAD-HOSP-01')!;
-                      const sel = selectedNodeId === n.node_id;
-                      return (
-                        <g
-                          onClick={() => setSelectedNodeId(n.node_id)}
-                          className="cursor-pointer"
-                        >
-                          <rect
-                            x="685"
-                            y="42"
-                            width="180"
-                            height="66"
-                            fill={sel ? '#161b22' : '#0d1017'}
-                            stroke={sel ? '#f0f6fc' : '#2ea043'}
-                            strokeWidth={sel ? '1.8' : '1.2'}
-                          />
-                          <text x="695" y="58" fill="#f0f6fc" fontSize="10" fontWeight="700">
-                            LOAD-HOSP-01 [PRIO-1]
-                          </text>
-                          <text x="695" y="72" fill="#8b949e" fontSize="9">
-                            Referral Clinic &amp; Maternity
-                          </text>
-                          <text x="695" y="96" fill="#3fb950" fontSize="11" fontWeight="700">
-                            {n.active_power_kw.toFixed(1)} kW
-                          </text>
-                          <text x="855" y="96" fill="#3fb950" fontSize="9" textAnchor="end">
-                            100% PROTECTED
-                          </text>
-                        </g>
-                      );
-                    })()}
-
-                    {/* NODE 6: LOAD-COMM-02 */}
-                    {(() => {
-                      const n = nodeById('LOAD-COMM-02')!;
-                      const sel = selectedNodeId === n.node_id;
-                      return (
-                        <g
-                          onClick={() => setSelectedNodeId(n.node_id)}
-                          className="cursor-pointer"
-                        >
-                          <rect
-                            x="685"
-                            y="170"
-                            width="180"
-                            height="66"
-                            fill={sel ? '#161b22' : '#0d1017'}
-                            stroke={
-                              n.status.includes('CURTAILED')
-                                ? '#d29922'
-                                : sel
-                                ? '#f0f6fc'
-                                : '#30363d'
-                            }
-                            strokeWidth={sel ? '1.8' : '1.2'}
-                          />
-                          <text x="695" y="186" fill="#f0f6fc" fontSize="10" fontWeight="700">
-                            LOAD-COMM-02 [FLEX]
-                          </text>
-                          <text x="695" y="200" fill="#8b949e" fontSize="9">
-                            SME Cold-Storage &amp; Agro Hub
-                          </text>
-                          <text
-                            x="695"
-                            y="224"
-                            fill={n.status.includes('CURTAILED') ? '#d29922' : '#e6edf3'}
-                            fontSize="11"
-                            fontWeight="700"
-                          >
-                            {n.active_power_kw.toFixed(1)} kW
-                          </text>
-                          <text x="855" y="224" fill="#8b949e" fontSize="9" textAnchor="end">
-                            {n.status}
-                          </text>
-                        </g>
-                      );
-                    })()}
                   </svg>
                 </div>
               </div>
 
-              {/* DENSE ASSET TELEMETRY MATRIX TABLE */}
-              <div className="p-3 bg-[#0a0c10]">
-                <div className="flex items-center justify-between mb-2 font-mono text-[11px]">
-                  <span className="text-[#8b949e]">
-                    CORRIDOR ASSET TELEMETRY MATRIX (6 NODES // 1500 MS POLLING)
-                  </span>
-                  <span className="text-[#8b949e]">
-                    SELECTED: <strong className="text-[#f0f6fc]">{selectedNode.node_id}</strong>
+              <div>
+                <div className="flex justify-between text-xs text-zinc-500 mb-3">
+                  <span>Frequency stability (50.00 Hz nominal)</span>
+                  <span className="font-mono text-zinc-300 tabular-nums">
+                    {metrics.frequency_hz.toFixed(2)} Hz
                   </span>
                 </div>
-                <div className="overflow-x-auto border border-[#1e2430]">
-                  <table className="w-full text-left border-collapse font-mono text-xs">
-                    <thead>
-                      <tr className="border-b border-[#1e2430] bg-[#0d1017] text-[10px] text-[#8b949e]">
-                        <th className="py-2 px-2.5">NODE_ID</th>
-                        <th className="py-2 px-2.5">DESIGNATION</th>
-                        <th className="py-2 px-2.5">CLASS</th>
-                        <th className="py-2 px-2.5 text-right">ACTIVE_P</th>
-                        <th className="py-2 px-2.5 text-right">RATED</th>
-                        <th className="py-2 px-2.5 text-right">LOAD_%</th>
-                        <th className="py-2 px-2.5 text-right">BUS_V</th>
-                        <th className="py-2 px-2.5 text-right">TEMP</th>
-                        <th className="py-2 px-2.5">STATUS</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1e2430] tabular-nums">
-                      {snapshot.nodes.map((node) => {
-                        const isSelected = node.node_id === selectedNode.node_id;
-                        return (
-                          <tr
-                            key={node.node_id}
-                            onClick={() => setSelectedNodeId(node.node_id)}
-                            className={`cursor-pointer transition-colors ${
-                              isSelected
-                                ? 'bg-[#161b22] text-[#f0f6fc]'
-                                : 'hover:bg-[#0d1017] text-[#c9d1d9]'
-                            }`}
-                          >
-                            <td className="py-2 px-2.5 font-semibold text-[#58a6ff]">
-                              {node.node_id}
-                            </td>
-                            <td className="py-2 px-2.5 font-sans text-xs">{node.node_name}</td>
-                            <td className="py-2 px-2.5 text-[10px] text-[#8b949e]">
-                              {node.node_type}
-                            </td>
-                            <td className="py-2 px-2.5 text-right font-semibold">
-                              {node.active_power_kw.toFixed(1)} kW
-                            </td>
-                            <td className="py-2 px-2.5 text-right text-[#8b949e]">
-                              {node.rated_capacity_kw.toFixed(0)} kW
-                            </td>
-                            <td className="py-2 px-2.5 text-right">
-                              <span
-                                className={
-                                  node.load_pct > 88
-                                    ? 'text-[#f85149] font-semibold'
-                                    : node.load_pct > 78
-                                    ? 'text-[#d29922]'
-                                    : 'text-[#e6edf3]'
-                                }
-                              >
-                                {node.load_pct.toFixed(1)}%
-                              </span>
-                            </td>
-                            <td className="py-2 px-2.5 text-right">
-                              {node.voltage_v.toFixed(1)} V
-                            </td>
-                            <td className="py-2 px-2.5 text-right">
-                              {node.temperature_c.toFixed(1)} °C
-                            </td>
-                            <td className="py-2 px-2.5 text-[10px]">
-                              <span
-                                className={`inline-block px-1.5 py-0.5 border ${
-                                  node.status.includes('CRITICAL') ||
-                                  node.status.includes('OFFLINE')
-                                    ? 'border-[#f85149]/50 bg-[#f85149]/10 text-[#f85149]'
-                                    : node.status.includes('CURTAILED') ||
-                                      node.status.includes('HIGH_LOAD') ||
-                                      node.status.includes('LOW_IRRADIANCE')
-                                    ? 'border-[#d29922]/50 bg-[#d29922]/10 text-[#d29922]'
-                                    : node.status.includes('DISCHARGING')
-                                    ? 'border-[#58a6ff]/50 bg-[#58a6ff]/10 text-[#58a6ff]'
-                                    : 'border-[#2ea043]/40 bg-[#2ea043]/10 text-[#3fb950]'
-                                }`}
-                              >
-                                {node.status}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* SQLITE WAL ACID DISPATCH AUDIT LEDGER */}
-              <div className="p-3 bg-[#0a0c10] flex-1">
-                <div className="flex items-center justify-between mb-2 font-mono text-[11px]">
-                  <span className="text-[#8b949e]">
-                    ACID STATE TRANSITION &amp; PROTECTION LEDGER (SQLITE WAL // IDEMPOTENT KEYS)
-                  </span>
-                  <span className="text-[#8b949e]">
-                    RECORDS: {snapshot.recent_events.length}
-                  </span>
-                </div>
-                <div className="overflow-x-auto border border-[#1e2430]">
-                  <table className="w-full text-left border-collapse font-mono text-[11px]">
-                    <thead>
-                      <tr className="border-b border-[#1e2430] bg-[#0d1017] text-[10px] text-[#8b949e]">
-                        <th className="py-1.5 px-2.5">IDEMPOTENCY_KEY</th>
-                        <th className="py-1.5 px-2.5">UTC_TIME</th>
-                        <th className="py-1.5 px-2.5">TRANSITION</th>
-                        <th className="py-1.5 px-2.5 text-right">FREQ</th>
-                        <th className="py-1.5 px-2.5 text-right">TR_LOAD</th>
-                        <th className="py-1.5 px-2.5 text-right">BESS_P</th>
-                        <th className="py-1.5 px-2.5">DISPATCH_ACTION</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1e2430] tabular-nums">
-                      {snapshot.recent_events.slice(0, 6).map((evt) => (
-                        <tr key={evt.idempotency_key} className="hover:bg-[#0d1017]">
-                          <td className="py-1.5 px-2.5 text-[#58a6ff] whitespace-nowrap">
-                            {evt.idempotency_key}
-                          </td>
-                          <td className="py-1.5 px-2.5 text-[#8b949e] whitespace-nowrap">
-                            {new Date(evt.timestamp_utc).toISOString().slice(11, 19)}
-                          </td>
-                          <td className="py-1.5 px-2.5 whitespace-nowrap">
-                            <span className="text-[#8b949e]">{evt.previous_state}</span>
-                            <span className="mx-1 text-[#484f58]">-&gt;</span>
-                            <span className={`font-semibold ${stateColorText(evt.new_state)}`}>
-                              {evt.new_state}
-                            </span>
-                          </td>
-                          <td className="py-1.5 px-2.5 text-right whitespace-nowrap">
-                            {evt.frequency_at_trigger_hz.toFixed(2)} Hz
-                          </td>
-                          <td className="py-1.5 px-2.5 text-right whitespace-nowrap">
-                            {evt.transformer_load_pct.toFixed(1)}%
-                          </td>
-                          <td className="py-1.5 px-2.5 text-right whitespace-nowrap">
-                            {evt.bess_dispatch_kw.toFixed(1)} kW
-                          </td>
-                          <td className="py-1.5 px-2.5 font-sans text-xs text-[#c9d1d9]">
-                            {evt.action_taken}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="h-16 border-b border-zinc-800/80 flex items-end">
+                  <svg viewBox="0 0 300 60" className="w-full h-full overflow-visible">
+                    <polyline
+                      fill="none"
+                      stroke="#a1a1aa"
+                      strokeWidth="1.25"
+                      points={history
+                        .map((pt, i) => {
+                          const x = (i / Math.max(1, history.length - 1)) * 300;
+                          const clamped = Math.min(50.4, Math.max(48.8, pt.freq));
+                          const y = 60 - ((clamped - 48.8) / 1.6) * 55;
+                          return `${x.toFixed(1)},${y.toFixed(1)}`;
+                        })
+                        .join(' ')}
+                    />
+                  </svg>
                 </div>
               </div>
             </div>
 
-            {/* RIGHT 4 COLUMNS: NODE REGISTER INSPECTOR + MULTI-TRACE STRIP CHART */}
-            <div className="lg:col-span-4 flex flex-col divide-y divide-[#1e2430] bg-[#0d1017]">
-              {/* SELECTED ASSET & 64-BIT RTU REGISTER INSPECTOR */}
-              <div className="p-3">
-                <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#1e2430] font-mono text-[11px]">
-                  <span className="text-[#8b949e]">ASSET &amp; RTU REGISTER INSPECTOR</span>
-                  <span className="text-[#58a6ff] font-semibold">{selectedNode.node_id}</span>
-                </div>
+            {/* CLEAN NODES TABLE */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-medium text-zinc-400">Nodes</h2>
+                <span className="text-xs font-mono text-zinc-500">
+                  Selected: {selectedNode.node_id} ({selectedNode.temperature_c.toFixed(1)} °C)
+                </span>
+              </div>
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-zinc-500 font-normal">
+                    <th className="py-2.5 font-normal">Node</th>
+                    <th className="py-2.5 font-normal">ID</th>
+                    <th className="py-2.5 font-normal text-right">Active power</th>
+                    <th className="py-2.5 font-normal text-right">Capacity</th>
+                    <th className="py-2.5 font-normal text-right">Load</th>
+                    <th className="py-2.5 font-normal text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/50 font-mono tabular-nums">
+                  {snapshot.nodes.map((n) => (
+                    <tr
+                      key={n.node_id}
+                      onClick={() => setSelectedNodeId(n.node_id)}
+                      className={`cursor-pointer transition-colors ${
+                        selectedNodeId === n.node_id ? 'bg-zinc-900/70' : 'hover:bg-zinc-900/30'
+                      }`}
+                    >
+                      <td className="py-3 font-sans text-zinc-200">{n.node_name}</td>
+                      <td className="py-3 text-zinc-500">{n.node_id}</td>
+                      <td className="py-3 text-right text-zinc-200">
+                        {n.active_power_kw.toFixed(1)} kW
+                      </td>
+                      <td className="py-3 text-right text-zinc-500">
+                        {n.rated_capacity_kw.toFixed(0)} kW
+                      </td>
+                      <td className="py-3 text-right text-zinc-300">{n.load_pct.toFixed(1)}%</td>
+                      <td className="py-3 text-right text-zinc-400">{n.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-                <div className="grid grid-cols-2 gap-px bg-[#1e2430] border border-[#1e2430] font-mono text-xs mb-3">
-                  <div className="bg-[#0a0c10] p-2">
-                    <div className="text-[10px] text-[#8b949e]">DESIGNATION</div>
-                    <div className="text-[#f0f6fc] font-sans font-medium truncate mt-0.5">
-                      {selectedNode.node_name}
+            {/* MINIMAL EVENT LOG */}
+            <div>
+              <h2 className="text-xs font-medium text-zinc-400 mb-3">Recent dispatch log</h2>
+              <div className="divide-y divide-zinc-800/50 border-t border-zinc-800/80 text-xs">
+                {snapshot.recent_events.slice(0, 5).map((evt) => (
+                  <div
+                    key={evt.idempotency_key}
+                    className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-zinc-500 tabular-nums">
+                        {new Date(evt.timestamp_utc).toISOString().slice(11, 19)}
+                      </span>
+                      <span className="text-zinc-300">{evt.action_taken}</span>
                     </div>
+                    <span className="font-mono text-zinc-500 tabular-nums shrink-0">
+                      {evt.idempotency_key}
+                    </span>
                   </div>
-                  <div className="bg-[#0a0c10] p-2">
-                    <div className="text-[10px] text-[#8b949e]">REGION / ZONE</div>
-                    <div className="text-[#f0f6fc] mt-0.5">{selectedNode.region}</div>
-                  </div>
-                  <div className="bg-[#0a0c10] p-2">
-                    <div className="text-[10px] text-[#8b949e]">ACTIVE POWER</div>
-                    <div className="text-[#f0f6fc] font-semibold tabular-nums mt-0.5">
-                      {selectedNode.active_power_kw.toFixed(1)} / {selectedNode.rated_capacity_kw.toFixed(0)} kW
-                    </div>
-                  </div>
-                  <div className="bg-[#0a0c10] p-2">
-                    <div className="text-[10px] text-[#8b949e]">UTILIZATION / TEMP</div>
-                    <div className="text-[#f0f6fc] font-semibold tabular-nums mt-0.5">
-                      {selectedNode.load_pct.toFixed(1)}% | {selectedNode.temperature_c.toFixed(1)} °C
-                    </div>
-                  </div>
-                </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
-                {selectedRtuFrame && (
-                  <div className="border border-[#1e2430] bg-[#0a0c10] p-2.5 font-mono text-[11px]">
-                    <div className="flex items-center justify-between text-[10px] text-[#8b949e] mb-1.5">
-                      <span>64-BIT RTU WIRE FRAME (BIG-ENDIAN)</span>
-                      <span className="text-[#3fb950]">CRC-8 0x07 OK</span>
+        {/* TAB 2: TOPOLOGY */}
+        {activeTab === 'topology' && subsystems && (
+          <div className="py-8 space-y-10">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-medium text-zinc-400">
+                  Shortest-loss critical delivery path (Dijkstra)
+                </h2>
+                <span className="text-xs font-mono text-zinc-400 tabular-nums">
+                  Impedance cost: {subsystems.network_routing.hospital_route.total_impedance_cost}
+                </span>
+              </div>
+              <div className="py-4 px-5 border border-zinc-800/80 rounded-md font-mono text-xs text-zinc-200 flex items-center gap-3">
+                {subsystems.network_routing.hospital_route.path.map((id, idx, arr) => (
+                  <span key={id} className="flex items-center gap-3">
+                    <span>{id}</span>
+                    {idx < arr.length - 1 && <span className="text-zinc-600">→</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-medium text-zinc-400">
+                  Radial spanning tree (Prim MST)
+                </h2>
+                <span className="text-xs font-mono text-zinc-500 tabular-nums">
+                  Total impedance: {subsystems.network_routing.radial_topology.total_mst_impedance}
+                </span>
+              </div>
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-zinc-500">
+                    <th className="py-2.5 font-normal">From</th>
+                    <th className="py-2.5 font-normal">To</th>
+                    <th className="py-2.5 font-normal">Feeder segment</th>
+                    <th className="py-2.5 font-normal text-right">Impedance weight</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/50 font-mono tabular-nums">
+                  {subsystems.network_routing.radial_topology.edges.map((e) => (
+                    <tr key={`${e.from}-${e.to}`}>
+                      <td className="py-3 text-zinc-200">{e.from}</td>
+                      <td className="py-3 text-zinc-300">{e.to}</td>
+                      <td className="py-3 font-sans text-zinc-400">{e.line}</td>
+                      <td className="py-3 text-right text-zinc-200">{e.weight.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: DISPATCH */}
+        {activeTab === 'dispatch' && subsystems && (
+          <div className="py-8 space-y-10">
+            <div>
+              <h2 className="text-xs font-medium text-zinc-400 mb-3">Battery dispatch profile</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {STRATEGIES.map((s) => {
+                  const active = subsystems.dispatch_architecture.active_strategy === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => changeStrategy(s.id)}
+                      className={`p-4 text-left rounded-md border transition-colors ${
+                        active
+                          ? 'border-zinc-200 bg-zinc-900/60'
+                          : 'border-zinc-800/80 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="text-xs font-medium text-zinc-100">{s.name}</div>
+                      <div className="mt-1.5 text-xs text-zinc-500 leading-relaxed">
+                        {s.summary}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
+              <div>
+                <h2 className="text-xs font-medium text-zinc-400 mb-3">Zone power balance</h2>
+                <div className="border-t border-zinc-800/80 divide-y divide-zinc-800/50 text-xs">
+                  {subsystems.dispatch_architecture.zone_hierarchy.children?.map((zone) => (
+                    <div key={zone.id} className="py-3">
+                      <div className="flex justify-between font-medium text-zinc-200 mb-1.5">
+                        <span>{zone.name}</span>
+                        <span className="font-mono tabular-nums">
+                          {zone.net_power_kw.toFixed(1)} kW
+                        </span>
+                      </div>
+                      {zone.children?.map((leaf) => (
+                        <div
+                          key={leaf.id}
+                          className="flex justify-between py-1 text-zinc-500 pl-3"
+                        >
+                          <span>{leaf.name}</span>
+                          <span className="font-mono tabular-nums">
+                            {(leaf.net_power_kw > 0 ? '+' : '') + leaf.net_power_kw.toFixed(1)} kW
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                    <div className="p-1.5 bg-[#07090d] border border-[#1e2430] text-[#58a6ff] text-xs tracking-wider mb-2">
-                      {selectedRtuFrame.hex_frame}
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
-                      <div className="flex justify-between">
-                        <span className="text-[#8b949e]">SYNC [B0]:</span>
-                        <span className="text-[#e6edf3]">
-                          {selectedRtuFrame.register_breakdown.sync_byte}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#8b949e]">ID|FLG [B1]:</span>
-                        <span className="text-[#e6edf3]">
-                          {selectedRtuFrame.register_breakdown.id_status_bits}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#8b949e]">VOLT [B2..3]:</span>
-                        <span className="text-[#e6edf3]">
-                          {selectedRtuFrame.register_breakdown.volt_fixed16}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#8b949e]">FREQ [B4..5]:</span>
-                        <span className="text-[#e6edf3]">
-                          {selectedRtuFrame.register_breakdown.freq_fixed16}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#8b949e]">LOAD [B6]:</span>
-                        <span className="text-[#e6edf3]">
-                          {selectedRtuFrame.register_breakdown.load_uint8}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[#8b949e]">CRC8 [B7]:</span>
-                        <span className="text-[#3fb950]">
-                          {selectedRtuFrame.register_breakdown.crc8_checksum}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
 
-              {/* MULTI-CHANNEL STRIP CHART RECORDER */}
-              <div className="p-3 flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#1e2430] font-mono text-[11px]">
-                    <span className="text-[#8b949e]">REAL-TIME TELEMETRY STRIP RECORDER</span>
-                    <span className="text-[#8b949e]">WINDOW: 40 CYCLES</span>
+              <div>
+                <h2 className="text-xs font-medium text-zinc-400 mb-3">
+                  Telemetry buffer synchronization
+                </h2>
+                <div className="border-t border-zinc-800/80 divide-y divide-zinc-800/50 text-xs font-mono tabular-nums">
+                  <div className="py-2.5 flex justify-between">
+                    <span className="font-sans text-zinc-500">Synchronizer</span>
+                    <span className="text-zinc-300">RLock + Compare-And-Swap</span>
                   </div>
-
-                  {/* TRACE 1: TRANSFORMER LOAD & HOTSPOT */}
-                  <div className="mb-3">
-                    <div className="flex justify-between font-mono text-[10px] text-[#8b949e] mb-1">
-                      <span>CH1: TR-NRB-04 LOAD (%) &amp; HOTSPOT (°C)</span>
-                      <span className="text-[#e6edf3] tabular-nums">
-                        {metrics.transformer_load_pct.toFixed(1)}% / {windingHotspot.toFixed(1)}°C
-                      </span>
-                    </div>
-                    <div className="border border-[#1e2430] bg-[#07090d] p-1.5">
-                      <svg viewBox="0 0 360 90" className="w-full h-24 overflow-visible">
-                        {/* 82% Thermal Guard Line */}
-                        <line
-                          x1="0"
-                          y1={90 - (82 / 140) * 90}
-                          x2="360"
-                          y2={90 - (82 / 140) * 90}
-                          stroke="#d29922"
-                          strokeWidth="0.8"
-                          strokeDasharray="3 3"
-                        />
-                        <polyline
-                          fill="none"
-                          stroke="#58a6ff"
-                          strokeWidth="1.6"
-                          points={history
-                            .map((pt, idx) => {
-                              const x = (idx / Math.max(1, history.length - 1)) * 360;
-                              const y = 90 - (Math.min(140, Math.max(0, pt.load)) / 140) * 90;
-                              return `${x.toFixed(1)},${y.toFixed(1)}`;
-                            })
-                            .join(' ')}
-                        />
-                        <polyline
-                          fill="none"
-                          stroke="#f85149"
-                          strokeWidth="1.2"
-                          strokeDasharray="2 2"
-                          points={history
-                            .map((pt, idx) => {
-                              const x = (idx / Math.max(1, history.length - 1)) * 360;
-                              const y = 90 - (Math.min(140, Math.max(0, pt.hotspot)) / 140) * 90;
-                              return `${x.toFixed(1)},${y.toFixed(1)}`;
-                            })
-                            .join(' ')}
-                        />
-                      </svg>
-                    </div>
+                  <div className="py-2.5 flex justify-between">
+                    <span className="font-sans text-zinc-500">Ring buffer capacity</span>
+                    <span className="text-zinc-300">
+                      {subsystems.concurrency_engine.ring_buffer_capacity} frames
+                    </span>
                   </div>
-
-                  {/* TRACE 2: BUS FREQUENCY */}
-                  <div>
-                    <div className="flex justify-between font-mono text-[10px] text-[#8b949e] mb-1">
-                      <span>CH2: SECONDARY BUS FREQUENCY (48.80..50.40 Hz)</span>
-                      <span className="text-[#3fb950] tabular-nums">
-                        {metrics.frequency_hz.toFixed(2)} Hz
-                      </span>
-                    </div>
-                    <div className="border border-[#1e2430] bg-[#07090d] p-1.5">
-                      <svg viewBox="0 0 360 75" className="w-full h-20 overflow-visible">
-                        {/* 50.00 Hz Nominal Line */}
-                        <line
-                          x1="0"
-                          y1={75 - ((50.0 - 48.8) / 1.6) * 75}
-                          x2="360"
-                          y2={75 - ((50.0 - 48.8) / 1.6) * 75}
-                          stroke="#30363d"
-                          strokeWidth="0.8"
-                        />
-                        {/* 49.20 Hz Under-Frequency Relay Trip Line */}
-                        <line
-                          x1="0"
-                          y1={75 - ((49.2 - 48.8) / 1.6) * 75}
-                          x2="360"
-                          y2={75 - ((49.2 - 48.8) / 1.6) * 75}
-                          stroke="#f85149"
-                          strokeWidth="0.8"
-                          strokeDasharray="3 3"
-                        />
-                        <polyline
-                          fill="none"
-                          stroke="#3fb950"
-                          strokeWidth="1.6"
-                          points={history
-                            .map((pt, idx) => {
-                              const x = (idx / Math.max(1, history.length - 1)) * 360;
-                              const clamped = Math.min(50.4, Math.max(48.8, pt.freq));
-                              const y = 75 - ((clamped - 48.8) / 1.6) * 75;
-                              return `${x.toFixed(1)},${y.toFixed(1)}`;
-                            })
-                            .join(' ')}
-                        />
-                      </svg>
-                    </div>
+                  <div className="py-2.5 flex justify-between">
+                    <span className="font-sans text-zinc-500">Frames processed</span>
+                    <span className="text-zinc-300">
+                      {subsystems.concurrency_engine.frames_processed_seq}
+                    </span>
                   </div>
-                </div>
-
-                {/* QUICK STRATEGY SWITCHER IN SIDEBAR */}
-                <div className="pt-3 border-t border-[#1e2430]">
-                  <div className="font-mono text-[10px] text-[#8b949e] mb-1.5">
-                    ACTIVE BESS INVERTER CONTROL LAW
+                  <div className="py-2.5 flex justify-between">
+                    <span className="font-sans text-zinc-500">Mutex lock acquisitions</span>
+                    <span className="text-zinc-300">
+                      {subsystems.concurrency_engine.lock_acquisitions}
+                    </span>
                   </div>
-                  <div className="grid grid-cols-1 gap-1">
-                    {STRATEGIES.map((strat) => {
-                      const active =
-                        (subsystems?.dispatch_architecture.active_strategy ??
-                          snapshot.active_strategy) === strat.id;
-                      return (
-                        <button
-                          key={strat.id}
-                          onClick={() => changeStrategy(strat.id)}
-                          className={`px-2.5 py-1.5 text-left font-mono text-[10px] border flex items-center justify-between transition-colors ${
-                            active
-                              ? 'border-[#58a6ff] bg-[#58a6ff]/10 text-[#f0f6fc] font-semibold'
-                              : 'border-[#1e2430] bg-[#0a0c10] text-[#8b949e] hover:text-[#e6edf3]'
-                          }`}
-                        >
-                          <span>
-                            {strat.code} // {strat.id}
-                          </span>
-                          <span>{active ? '[ACTIVE]' : 'SELECT'}</span>
-                        </button>
-                      );
-                    })}
+                  <div className="py-2.5 flex justify-between">
+                    <span className="font-sans text-zinc-500">Atomic CAS transitions</span>
+                    <span className="text-zinc-300">
+                      {subsystems.concurrency_engine.cas_transitions_committed}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1872,78 +1272,87 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === 'TOPOLOGY' && subsystems && (
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#1e2430]">
-            {/* DIJKSTRA SHORTEST-LOSS HOSPITAL ROUTING */}
-            <div className="lg:col-span-6 p-4 bg-[#0a0c10]">
-              <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#1e2430] font-mono text-xs">
-                <span className="text-[#f0f6fc] font-semibold">
-                  SHORTEST-LOSS CRITICAL LOAD ROUTER (DIJKSTRA MIN-HEAP SOLVER)
-                </span>
-                <span className="text-[#3fb950]">
-                  COST: {subsystems.network_routing.hospital_route.total_impedance_cost.toFixed(3)} Ω_eq
-                </span>
-              </div>
+        {/* TAB 4: PROTOCOL & SAFETY INTERLOCK */}
+        {activeTab === 'protocol' && subsystems && (
+          <div className="py-8 space-y-10">
+            <div>
+              <h2 className="text-xs font-medium text-zinc-400 mb-3">
+                64-bit RTU binary frames (CRC-8 polynomial 0x07)
+              </h2>
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-zinc-500">
+                    <th className="py-2.5 font-normal">Node</th>
+                    <th className="py-2.5 font-normal">Wire frame (8 bytes)</th>
+                    <th className="py-2.5 font-normal">ID:Flags</th>
+                    <th className="py-2.5 font-normal text-right">Voltage</th>
+                    <th className="py-2.5 font-normal text-right">Frequency</th>
+                    <th className="py-2.5 font-normal text-right">CRC-8</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/50 font-mono tabular-nums">
+                  {subsystems.rtu_frames.map((f) => (
+                    <tr key={f.node_id}>
+                      <td className="py-3 text-zinc-300">{f.node_id}</td>
+                      <td className="py-3 text-zinc-100">{f.hex_frame}</td>
+                      <td className="py-3 text-zinc-500">{f.register_breakdown.id_status_bits}</td>
+                      <td className="py-3 text-right text-zinc-400">
+                        {f.register_breakdown.volt_fixed16}
+                      </td>
+                      <td className="py-3 text-right text-zinc-400">
+                        {f.register_breakdown.freq_fixed16}
+                      </td>
+                      <td className="py-3 text-right text-emerald-400">
+                        {f.register_breakdown.crc8_checksum}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-              <div className="border border-[#1e2430] bg-[#0d1017] p-3 font-mono text-xs mb-4">
-                <div className="text-[10px] text-[#8b949e] mb-2">
-                  ACTIVE MINIMUM-IMPEDANCE DELIVERY VECTOR (SOURCE -&gt; LOAD-HOSP-01)
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-xs font-medium text-zinc-400">Breaker safety interlock</h2>
+                  <span className="text-xs font-mono text-emerald-400">
+                    {subsystems.safety_interlock.invariant_satisfied ? 'Satisfied' : 'Violated'}
+                  </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {subsystems.network_routing.hospital_route.path.map((nodeId, idx, arr) => (
-                    <div key={nodeId} className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 border border-[#2ea043] bg-[#2ea043]/10 text-[#3fb950] font-semibold">
-                        {idx + 1}. {nodeId}
+                <div className="border-t border-zinc-800/80 divide-y divide-zinc-800/50 text-xs">
+                  {subsystems.safety_interlock.propositions.map((p) => (
+                    <div key={p.symbol} className="py-2.5 flex justify-between">
+                      <span className="text-zinc-400">
+                        <strong className="font-mono text-zinc-200 mr-2">{p.symbol}</strong>
+                        {p.label}
                       </span>
-                      {idx < arr.length - 1 && <span className="text-[#8b949e]">===&gt;</span>}
+                      <span className="font-mono text-zinc-300">{p.value ? 'true' : 'false'}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="font-mono text-[11px] text-[#8b949e] mb-2">
-                DYNAMIC THERMAL IMPEDANCE FORMULATION
-              </div>
-              <div className="border border-[#1e2430] bg-[#0d1017] p-3 font-mono text-xs text-[#c9d1d9] space-y-1.5">
-                <div>w_eff(u, v) = w_base(u, v) + max(0, (Load_TR - 75.0) * 0.12)</div>
-                <div className="text-[11px] text-[#8b949e]">
-                  When Kasarani 500kVA Transformer load exceeds 75%, winding copper losses increase
-                  effective feeder impedance and shift priority hospital routing toward BESS-KSM-01.
-                </div>
-              </div>
-            </div>
-
-            {/* PRIM RADIAL MINIMUM SPANNING TREE */}
-            <div className="lg:col-span-6 p-4 bg-[#0a0c10]">
-              <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#1e2430] font-mono text-xs">
-                <span className="text-[#f0f6fc] font-semibold">
-                  LOOP-FREE RADIAL FEEDER TOPOLOGY (PRIM MINIMUM SPANNING TREE)
-                </span>
-                <span className="text-[#58a6ff]">
-                  TOTAL MST IMPEDANCE: {subsystems.network_routing.radial_topology.total_mst_impedance.toFixed(3)}
-                </span>
-              </div>
-
-              <div className="border border-[#1e2430]">
-                <table className="w-full text-left border-collapse font-mono text-xs">
+              <div>
+                <h2 className="text-xs font-medium text-zinc-400 mb-3">
+                  SQLite relational aggregation (by asset class)
+                </h2>
+                <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-[#1e2430] bg-[#0d1017] text-[10px] text-[#8b949e]">
-                      <th className="py-2 px-3">EDGE_INDEX</th>
-                      <th className="py-2 px-3">UPSTREAM_BUS</th>
-                      <th className="py-2 px-3">DOWNSTREAM_BUS</th>
-                      <th className="py-2 px-3">PHYSICAL_FEEDER_LINE</th>
-                      <th className="py-2 px-3 text-right">IMPEDANCE_W</th>
+                    <tr className="border-b border-zinc-800 text-zinc-500">
+                      <th className="py-2 font-normal">Class</th>
+                      <th className="py-2 font-normal text-right">Mean power</th>
+                      <th className="py-2 font-normal text-right">Peak load</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#1e2430] tabular-nums">
-                    {subsystems.network_routing.radial_topology.edges.map((edge, i) => (
-                      <tr key={`${edge.from}-${edge.to}`} className="hover:bg-[#0d1017]">
-                        <td className="py-2 px-3 text-[#8b949e]">#0{i + 1}</td>
-                        <td className="py-2 px-3 text-[#f0f6fc] font-semibold">{edge.from}</td>
-                        <td className="py-2 px-3 text-[#58a6ff] font-semibold">{edge.to}</td>
-                        <td className="py-2 px-3 font-sans text-xs text-[#c9d1d9]">{edge.line}</td>
-                        <td className="py-2 px-3 text-right text-[#3fb950] font-semibold">
-                          {edge.weight.toFixed(3)}
+                  <tbody className="divide-y divide-zinc-800/50 font-mono tabular-nums">
+                    {subsystems.telemetry_analytics.map((row) => (
+                      <tr key={row.node_class}>
+                        <td className="py-2.5 text-zinc-300">{row.node_class}</td>
+                        <td className="py-2.5 text-right text-zinc-400">
+                          {row.avg_power_kw.toFixed(1)} kW
+                        </td>
+                        <td className="py-2.5 text-right text-zinc-400">
+                          {row.peak_load_pct.toFixed(1)}%
                         </td>
                       </tr>
                     ))}
@@ -1953,314 +1362,7 @@ export default function App() {
             </div>
           </div>
         )}
-
-        {activeTab === 'DISPATCH_SYNC' && subsystems && (
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#1e2430]">
-            {/* PLUGGABLE BESS DISPATCH STRATEGIES & COMPOSITE ZONE TREE */}
-            <div className="lg:col-span-7 p-4 bg-[#0a0c10] space-y-4">
-              <div>
-                <div className="pb-2 mb-3 border-b border-[#1e2430] font-mono text-xs font-semibold text-[#f0f6fc]">
-                  RUNTIME-SWAPPABLE BESS INVERTER DISPATCH LAWS
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  {STRATEGIES.map((s) => {
-                    const isCurrent =
-                      subsystems.dispatch_architecture.active_strategy === s.id;
-                    return (
-                      <div
-                        key={s.id}
-                        onClick={() => changeStrategy(s.id)}
-                        className={`p-3 border cursor-pointer transition-colors ${
-                          isCurrent
-                            ? 'border-[#58a6ff] bg-[#161b22]'
-                            : 'border-[#1e2430] bg-[#0d1017] hover:border-[#30363d]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between font-mono text-xs">
-                          <span className="font-bold text-[#f0f6fc]">
-                            {s.code} // {s.name} ({s.id})
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 text-[10px] border ${
-                              isCurrent
-                                ? 'border-[#3fb950] text-[#3fb950] bg-[#2ea043]/10'
-                                : 'border-[#30363d] text-[#8b949e]'
-                            }`}
-                          >
-                            {isCurrent ? 'ACTIVE LAW' : 'CLICK TO ACTIVATE'}
-                          </span>
-                        </div>
-                        <div className="mt-1.5 font-mono text-[11px] text-[#58a6ff]">
-                          {s.formula}
-                        </div>
-                        <div className="mt-1 text-xs text-[#8b949e]">{s.description}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* HIERARCHICAL COMPOSITE ZONE POWER AGGREGATION */}
-              <div>
-                <div className="pb-2 mb-3 border-b border-[#1e2430] font-mono text-xs font-semibold text-[#f0f6fc]">
-                  RECURSIVE COMPOSITE ZONE POWER AGGREGATION TREE
-                </div>
-                <div className="border border-[#1e2430] bg-[#0d1017] p-3 font-mono text-xs">
-                  <div className="flex justify-between py-1.5 border-b border-[#1e2430] font-bold text-[#f0f6fc]">
-                    <span>
-                      ROOT: {subsystems.dispatch_architecture.zone_hierarchy.id} (
-                      {subsystems.dispatch_architecture.zone_hierarchy.name})
-                    </span>
-                    <span className="text-[#58a6ff] tabular-nums">
-                      NET: {subsystems.dispatch_architecture.zone_hierarchy.net_power_kw.toFixed(1)} kW
-                    </span>
-                  </div>
-                  <div className="divide-y divide-[#1e2430] mt-1">
-                    {subsystems.dispatch_architecture.zone_hierarchy.children?.map((zone) => (
-                      <div key={zone.id} className="py-2 pl-4">
-                        <div className="flex justify-between font-semibold text-[#c9d1d9]">
-                          <span>
-                            +-- {zone.id} ({zone.name})
-                          </span>
-                          <span className="tabular-nums">{zone.net_power_kw.toFixed(1)} kW</span>
-                        </div>
-                        <div className="mt-1 space-y-1 pl-6 text-[11px] text-[#8b949e]">
-                          {zone.children?.map((leaf) => (
-                            <div key={leaf.id} className="flex justify-between">
-                              <span>
-                                |-- {leaf.id}: {leaf.name} [{leaf.role}]
-                              </span>
-                              <span
-                                className={`tabular-nums ${
-                                  leaf.net_power_kw >= 0 ? 'text-[#3fb950]' : 'text-[#d29922]'
-                                }`}
-                              >
-                                {(leaf.net_power_kw >= 0 ? '+' : '') +
-                                  leaf.net_power_kw.toFixed(1)}{' '}
-                                kW
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* CONCURRENCY ENGINE: REENTRANT MUTEX & CAS RING BUFFER */}
-            <div className="lg:col-span-5 p-4 bg-[#0a0c10]">
-              <div className="pb-2 mb-3 border-b border-[#1e2430] font-mono text-xs font-semibold text-[#f0f6fc]">
-                CONCURRENCY GUARD // REENTRANT MUTEX &amp; ATOMIC CAS RING BUFFER
-              </div>
-
-              <div className="grid grid-cols-2 gap-px bg-[#1e2430] border border-[#1e2430] font-mono mb-4">
-                <div className="bg-[#0d1017] p-3">
-                  <div className="text-[10px] text-[#8b949e]">LOCK ACQUISITIONS (RLOCK)</div>
-                  <div className="text-xl font-bold text-[#f0f6fc] tabular-nums mt-1">
-                    {subsystems.concurrency_engine.lock_acquisitions}
-                  </div>
-                </div>
-                <div className="bg-[#0d1017] p-3">
-                  <div className="text-[10px] text-[#8b949e]">CAS COMMITS VERIFIED</div>
-                  <div className="text-xl font-bold text-[#3fb950] tabular-nums mt-1">
-                    {subsystems.concurrency_engine.cas_transitions_committed}
-                  </div>
-                </div>
-                <div className="bg-[#0d1017] p-3">
-                  <div className="text-[10px] text-[#8b949e]">RING BUFFER OCCUPANCY</div>
-                  <div className="text-xl font-bold text-[#58a6ff] tabular-nums mt-1">
-                    {subsystems.concurrency_engine.buffer_occupancy_pct}% (32 SLOTS)
-                  </div>
-                </div>
-                <div className="bg-[#0d1017] p-3">
-                  <div className="text-[10px] text-[#8b949e]">RACE CONFLICTS PREVENTED</div>
-                  <div className="text-xl font-bold text-[#3fb950] tabular-nums mt-1">
-                    {subsystems.concurrency_engine.race_conditions_prevented}
-                  </div>
-                </div>
-              </div>
-
-              <div className="border border-[#1e2430] bg-[#0d1017] p-3 font-mono text-xs">
-                <div className="flex justify-between text-[10px] text-[#8b949e] mb-2">
-                  <span>32-SLOT CIRCULAR TELEMETRY BUFFER (WRITE CURSOR)</span>
-                  <span>
-                    HEAD SEQ #{subsystems.concurrency_engine.frames_processed_seq} (SLOT{' '}
-                    {subsystems.concurrency_engine.frames_processed_seq % 32})
-                  </span>
-                </div>
-                <div className="grid grid-cols-8 gap-1">
-                  {Array.from({ length: 32 }).map((_, idx) => {
-                    const activeHead =
-                      subsystems.concurrency_engine.frames_processed_seq % 32 === idx;
-                    const populated = idx < subsystems.concurrency_engine.frames_processed_seq;
-                    return (
-                      <div
-                        key={idx}
-                        className={`h-7 border flex items-center justify-center text-[10px] tabular-nums ${
-                          activeHead
-                            ? 'border-[#3fb950] bg-[#2ea043]/25 text-[#f0f6fc] font-bold'
-                            : populated
-                            ? 'border-[#1e2430] bg-[#0a0c10] text-[#8b949e]'
-                            : 'border-[#1e2430] bg-[#07090d] text-[#30363d]'
-                        }`}
-                      >
-                        {String(idx).padStart(2, '0')}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'PROTOCOL_SQL' && subsystems && (
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#1e2430]">
-            {/* 64-BIT RTU BINARY FRAMES */}
-            <div className="lg:col-span-7 p-4 bg-[#0a0c10] space-y-4">
-              <div>
-                <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#1e2430] font-mono text-xs">
-                  <span className="font-semibold text-[#f0f6fc]">
-                    64-BIT (8-BYTE) RTU BINARY TELEMETRY REGISTER STREAM
-                  </span>
-                  <span className="text-[#3fb950]">CRC-8 POLYNOMIAL 0x07 VERIFIED</span>
-                </div>
-                <div className="overflow-x-auto border border-[#1e2430]">
-                  <table className="w-full text-left border-collapse font-mono text-[11px]">
-                    <thead>
-                      <tr className="border-b border-[#1e2430] bg-[#0d1017] text-[10px] text-[#8b949e]">
-                        <th className="py-2 px-2.5">NODE_ID</th>
-                        <th className="py-2 px-2.5">RAW_64BIT_HEX_FRAME</th>
-                        <th className="py-2 px-2.5">ID_STATUS_BITS</th>
-                        <th className="py-2 px-2.5">VOLT_UINT16</th>
-                        <th className="py-2 px-2.5">FREQ_UINT16</th>
-                        <th className="py-2 px-2.5">CRC8</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1e2430] tabular-nums">
-                      {subsystems.rtu_frames.map((frame) => (
-                        <tr key={frame.node_id} className="hover:bg-[#0d1017]">
-                          <td className="py-2 px-2.5 font-semibold text-[#58a6ff]">
-                            {frame.node_id}
-                          </td>
-                          <td className="py-2 px-2.5 text-[#f0f6fc]">{frame.hex_frame}</td>
-                          <td className="py-2 px-2.5 text-[#d29922]">
-                            {frame.register_breakdown.id_status_bits}
-                          </td>
-                          <td className="py-2 px-2.5 text-[#8b949e]">
-                            {frame.register_breakdown.volt_fixed16}
-                          </td>
-                          <td className="py-2 px-2.5 text-[#8b949e]">
-                            {frame.register_breakdown.freq_fixed16}
-                          </td>
-                          <td className="py-2 px-2.5 text-[#3fb950]">
-                            {frame.register_breakdown.crc8_checksum}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* SQLITE WAL RELATIONAL AGGREGATION */}
-              <div>
-                <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#1e2430] font-mono text-xs">
-                  <span className="font-semibold text-[#f0f6fc]">
-                    SQLITE 3NF RELATIONAL ROLLUP (LEFT JOIN + GROUP BY NODE_TYPE)
-                  </span>
-                  <span className="text-[#8b949e]">PRAGMA journal_mode = WAL</span>
-                </div>
-                <div className="overflow-x-auto border border-[#1e2430]">
-                  <table className="w-full text-left border-collapse font-mono text-xs">
-                    <thead>
-                      <tr className="border-b border-[#1e2430] bg-[#0d1017] text-[10px] text-[#8b949e]">
-                        <th className="py-2 px-3">NODE_CLASS</th>
-                        <th className="py-2 px-3 text-right">SAMPLES_N</th>
-                        <th className="py-2 px-3 text-right">MEAN_ACTIVE_P</th>
-                        <th className="py-2 px-3 text-right">PEAK_LOAD_PCT</th>
-                        <th className="py-2 px-3 text-right">MEAN_TEMP</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1e2430] tabular-nums">
-                      {subsystems.telemetry_analytics.map((row) => (
-                        <tr key={row.node_class} className="hover:bg-[#0d1017]">
-                          <td className="py-2 px-3 font-semibold text-[#f0f6fc]">
-                            {row.node_class}
-                          </td>
-                          <td className="py-2 px-3 text-right text-[#8b949e]">
-                            {row.sample_count}
-                          </td>
-                          <td className="py-2 px-3 text-right text-[#58a6ff]">
-                            {row.avg_power_kw.toFixed(1)} kW
-                          </td>
-                          <td className="py-2 px-3 text-right text-[#e6edf3]">
-                            {row.peak_load_pct.toFixed(1)}%
-                          </td>
-                          <td className="py-2 px-3 text-right text-[#8b949e]">
-                            {row.avg_temp_c.toFixed(1)} °C
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* PROPOSITIONAL BREAKER SAFETY INTERLOCK */}
-            <div className="lg:col-span-5 p-4 bg-[#0a0c10]">
-              <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#1e2430] font-mono text-xs">
-                <span className="font-semibold text-[#f0f6fc]">
-                  PROPOSITIONAL BREAKER SAFETY INTERLOCK GATE
-                </span>
-                <span
-                  className={`px-2 py-0.5 text-[10px] border ${
-                    subsystems.safety_interlock.invariant_satisfied
-                      ? 'border-[#2ea043] bg-[#2ea043]/15 text-[#3fb950]'
-                      : 'border-[#f85149] bg-[#f85149]/15 text-[#f85149]'
-                  }`}
-                >
-                  {subsystems.safety_interlock.invariant_satisfied
-                    ? 'INVARIANT SATISFIED (TRUE)'
-                    : 'INTERLOCK VIOLATED (FALSE)'}
-                </span>
-              </div>
-
-              <div className="border border-[#1e2430] bg-[#0d1017] p-3 font-mono text-xs text-[#58a6ff] mb-3">
-                {subsystems.safety_interlock.formula}
-              </div>
-
-              <div className="border border-[#1e2430] divide-y divide-[#1e2430] font-mono text-xs">
-                {subsystems.safety_interlock.propositions.map((prop) => (
-                  <div
-                    key={prop.symbol}
-                    className="p-2.5 bg-[#0d1017] flex items-center justify-between"
-                  >
-                    <div>
-                      <span className="inline-block w-6 font-bold text-[#f0f6fc]">
-                        [{prop.symbol}]
-                      </span>
-                      <span className="font-sans text-xs text-[#c9d1d9]">{prop.label}</span>
-                    </div>
-                    <span
-                      className={`px-2 py-0.5 text-[10px] font-bold border ${
-                        prop.value
-                          ? 'border-[#2ea043]/50 bg-[#2ea043]/10 text-[#3fb950]'
-                          : 'border-[#30363d] bg-[#0a0c10] text-[#8b949e]'
-                      }`}
-                    >
-                      {prop.value ? '1 (TRUE)' : '0 (FALSE)'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
+      </div>
     </div>
   );
 }
