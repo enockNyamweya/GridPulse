@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 520" width="100%" height="100%" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+  <defs>
+    <linearGradient id="sldBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070B14"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <marker id="flowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10B981"/>
+    </marker>
+    <marker id="flowCyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#06B6D4"/>
+    </marker>
+    <marker id="flowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#F59E0B"/>
+    </marker>
+  </defs>
+
+  <rect width="1120" height="520" rx="12" fill="url(#sldBg)" stroke="#1E293B" stroke-width="2"/>
+
+  <rect x="24" y="20" width="1072" height="44" rx="6" fill="#0F172A" stroke="#1E293B" stroke-width="1.5"/>
+  <text x="44" y="47" fill="#F8FAFC" font-size="14" font-weight="700" letter-spacing="1">KENYAN DISTRIBUTION CORRIDOR // SINGLE-LINE DIAGRAM (SLD) &amp; PROTECTION FSM</text>
+  <text x="1076" y="47" fill="#38BDF8" font-size="11" font-weight="600" text-anchor="end">6 NODES / 7 GRAPH EDGES</text>
+
+  <rect x="24" y="80" width="640" height="416" rx="8" fill="#0B1324" stroke="#1E293B" stroke-width="1.5"/>
+  <text x="44" y="106" fill="#94A3B8" font-size="11" font-weight="700" letter-spacing="0.8">ELECTRICAL FEEDER TOPOLOGY &amp; DYNAMIC IMPEDANCE WEIGHTS</text>
+
+  <rect x="44" y="130" width="180" height="84" rx="6" fill="#0F172A" stroke="#10B981" stroke-width="1.5"/>
+  <text x="56" y="150" fill="#10B981" font-size="11" font-weight="700">GEN-OLK-01</text>
+  <text x="56" y="166" fill="#F8FAFC" font-size="10">Olkaria Geothermal</text>
+  <text x="56" y="182" fill="#94A3B8" font-size="10">Rated: 450.0 kW</text>
+  <text x="56" y="198" fill="#34D399" font-size="10">Rift Valley Baseload</text>
+
+  <rect x="44" y="250" width="180" height="84" rx="6" fill="#0F172A" stroke="#F59E0B" stroke-width="1.5"/>
+  <text x="56" y="270" fill="#FBBF24" font-size="11" font-weight="700">GEN-SOL-02</text>
+  <text x="56" y="286" fill="#F8FAFC" font-size="10">Nakuru Solar PV Array</text>
+  <text x="56" y="302" fill="#94A3B8" font-size="10">Rated: 280.0 kW</text>
+  <text x="56" y="318" fill="#FCD34D" font-size="10">Grid-Tied Inverter</text>
+
+  <rect x="268" y="130" width="176" height="88" rx="6" fill="#0F172A" stroke="#38BDF8" stroke-width="1.5"/>
+  <text x="280" y="150" fill="#38BDF8" font-size="11" font-weight="700">TR-NRB-04</text>
+  <text x="280" y="166" fill="#F8FAFC" font-size="10">Kasarani Step-Down</text>
+  <text x="280" y="182" fill="#94A3B8" font-size="10">Rated: 500.0 kVA</text>
+  <text x="280" y="198" fill="#E2E8F0" font-size="10">11kV / 240V Secondary</text>
+
+  <rect x="268" y="250" width="176" height="92" rx="6" fill="#0F172A" stroke="#06B6D4" stroke-width="1.5"/>
+  <text x="280" y="270" fill="#22D3EE" font-size="11" font-weight="700">BESS-KSM-01</text>
+  <text x="280" y="286" fill="#F8FAFC" font-size="10">LFP Battery Storage</text>
+  <text x="280" y="302" fill="#94A3B8" font-size="10">400 kWh / 250 kW</text>
+  <text x="280" y="318" fill="#10B981" font-size="10">4-Quadrant Inverter</text>
+  <text x="280" y="332" fill="#94A3B8" font-size="9">SoC Floor: 15% Reserve</text>
+
+  <rect x="476" y="130" width="168" height="88" rx="6" fill="#0F172A" stroke="#10B981" stroke-width="1.5"/>
+  <text x="488" y="150" fill="#34D399" font-size="11" font-weight="700">LOAD-HOSP-01</text>
+  <text x="488" y="166" fill="#F8FAFC" font-size="10">Referral Clinic</text>
+  <text x="488" y="182" fill="#94A3B8" font-size="10">Rated: 140.0 kW</text>
+  <text x="488" y="198" fill="#10B981" font-size="10">PRIORITY-1 CRITICAL</text>
+
+  <rect x="476" y="250" width="168" height="88" rx="6" fill="#0F172A" stroke="#A855F7" stroke-width="1.5"/>
+  <text x="488" y="270" fill="#C084FC" font-size="11" font-weight="700">LOAD-COMM-02</text>
+  <text x="488" y="286" fill="#F8FAFC" font-size="10">SME Cold-Storage Hub</text>
+  <text x="488" y="302" fill="#94A3B8" font-size="10">Rated: 320.0 kW</text>
+  <text x="488" y="318" fill="#F59E0B" font-size="10">FLEXIBLE DR LOAD</text>
+
+  <line x1="224" y1="172" x2="264" y2="172" stroke="#10B981" stroke-width="2" marker-end="url(#flowGreen)"/>
+  <text x="244" y="164" fill="#10B981" font-size="9" text-anchor="middle">1.2</text>
+
+  <line x1="224" y1="275" x2="264" y2="195" stroke="#F59E0B" stroke-width="1.8" marker-end="url(#flowAmber)"/>
+  <text x="234" y="232" fill="#FBBF24" font-size="9">1.5</text>
+
+  <line x1="224" y1="292" x2="264" y2="292" stroke="#F59E0B" stroke-width="2" marker-end="url(#flowAmber)"/>
+  <text x="244" y="284" fill="#FBBF24" font-size="9" text-anchor="middle">0.9</text>
+
+  <line x1="356" y1="218" x2="356" y2="246" stroke="#06B6D4" stroke-width="2" marker-end="url(#flowCyan)"/>
+  <text x="386" y="236" fill="#22D3EE" font-size="9">0.8 + pen</text>
+
+  <line x1="444" y1="172" x2="472" y2="172" stroke="#10B981" stroke-width="2" marker-end="url(#flowGreen)"/>
+  <text x="458" y="164" fill="#34D399" font-size="9" text-anchor="middle">1.1</text>
+
+  <line x1="444" y1="278" x2="472" y2="198" stroke="#06B6D4" stroke-width="2" stroke-dasharray="4 2" marker-end="url(#flowCyan)"/>
+  <text x="448" y="248" fill="#22D3EE" font-size="9">0.7</text>
+
+  <line x1="444" y1="302" x2="472" y2="302" stroke="#06B6D4" stroke-width="1.8" marker-end="url(#flowCyan)"/>
+  <text x="458" y="295" fill="#22D3EE" font-size="9" text-anchor="middle">1.3</text>
+
+  <rect x="44" y="362" width="600" height="114" rx="6" fill="#0F172A" stroke="#1E293B"/>
+  <text x="60" y="384" fill="#E2E8F0" font-size="11" font-weight="700">Dynamic Graph Routing Behavior (Dijkstra + Prim MST):</text>
+  <text x="60" y="404" fill="#94A3B8" font-size="10">1. Nominal Operation: GEN-OLK-01 -&gt; TR-NRB-04 -&gt; LOAD-HOSP-01 (Lowest line loss when load &lt; 80%).</text>
+  <text x="60" y="422" fill="#94A3B8" font-size="10">2. Transformer Thermal Stress: Thermal penalty elevates TR-NRB-04 edge weights; Dijkstra reroutes</text>
+  <text x="60" y="438" fill="#94A3B8" font-size="10">   critical hospital power via BESS-KSM-01 (weight 0.7) to bypass transformer copper losses.</text>
+  <text x="60" y="456" fill="#94A3B8" font-size="10">3. Upstream Blackout: GEN-OLK-01 edge weight -&gt; 999.0 (Open PCC); GEN-SOL-02 + BESS-KSM-01 energize island.</text>
+
+  <rect x="684" y="80" width="412" height="416" rx="8" fill="#0B1324" stroke="#1E293B" stroke-width="1.5"/>
+  <text x="704" y="106" fill="#94A3B8" font-size="11" font-weight="700" letter-spacing="0.8">DETERMINISTIC PROTECTION STATE MACHINE</text>
+
+  <rect x="704" y="126" width="372" height="74" rx="6" fill="#0F172A" stroke="#10B981" stroke-width="1.5"/>
+  <text x="720" y="146" fill="#10B981" font-size="12" font-weight="700">[STATE 01] STABLE</text>
+  <text x="720" y="164" fill="#CBD5E1" font-size="10">Condition: Upstream online &amp; Transformer Load &lt;= 78%</text>
+  <text x="720" y="182" fill="#94A3B8" font-size="10">Action: 50.00 Hz nominal bus; surplus PV trickle-charges BESS.</text>
+
+  <rect x="704" y="216" width="372" height="74" rx="6" fill="#0F172A" stroke="#06B6D4" stroke-width="1.5"/>
+  <text x="720" y="236" fill="#22D3EE" font-size="12" font-weight="700">[STATE 02] BESS_DISPATCH_ACTIVE</text>
+  <text x="720" y="254" fill="#CBD5E1" font-size="10">Condition: Net Deficit &gt; 15 kW or Load &gt; 80%</text>
+  <text x="720" y="272" fill="#94A3B8" font-size="10">Action: Active Strategy injects LFP inverter power (up to 250 kW).</text>
+
+  <rect x="704" y="306" width="372" height="74" rx="6" fill="#0F172A" stroke="#F59E0B" stroke-width="1.5"/>
+  <text x="720" y="326" fill="#FBBF24" font-size="12" font-weight="700">[STATE 03] DEMAND_RESPONSE_SHED</text>
+  <text x="720" y="344" fill="#CBD5E1" font-size="10">Condition: Residual Deficit &gt; 195 kW (Peak Surge)</text>
+  <text x="720" y="362" fill="#94A3B8" font-size="10">Action: Curtails LOAD-COMM-02 by 28%; preserves Clinic 100%.</text>
+
+  <rect x="704" y="396" width="372" height="80" rx="6" fill="#0F172A" stroke="#F43F5E" stroke-width="1.5"/>
+  <text x="720" y="416" fill="#FB7185" font-size="12" font-weight="700">[STATE 04] FAULT_ISLANDING</text>
+  <text x="720" y="434" fill="#CBD5E1" font-size="10">Condition: GEN-OLK-01 = 0 kW (National Grid Outage)</text>
+  <text x="720" y="452" fill="#94A3B8" font-size="10">Action: Opens PCC breaker; forms autonomous Solar + BESS island</text>
+  <text x="720" y="466" fill="#94A3B8" font-size="10">        and curtails flexible commercial load by 35%.</text>
+</svg>
