@@ -11,5 +11,6 @@ backend/*.db-wal
 node_modules/
 frontend/node_modules/
 frontend/dist/
+*.tsbuildinfo
 .DS_Store
 *.log
