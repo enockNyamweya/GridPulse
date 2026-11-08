@@ -27,9 +27,9 @@ The structural bottleneck lies in secondary distribution visibility and automate
 
 GridPulse is structured across three decoupled operational tiers:
 
-1. **Field telemetry and physics simulation layer (`backend/simulator.py`):** Computes real-time 50.00 Hz frequency droop, secondary bus voltage regulation, transformer oil thermal inertia, and Lithium Iron Phosphate (LFP) battery Coulomb counting across a 6-node Kenyan distribution corridor at 1.5-second intervals.
+1. **Field telemetry and physics simulation layer (`backend/simulator.py`):** Computes real-time 50.00 Hz frequency droop, secondary bus voltage regulation, IEC 60076-7 transformer top-oil ($\Theta_{\text{oil}}$) and winding hot-spot ($\Theta_{\text{hs}}$) temperatures, relative thermal aging acceleration ($F_{\text{AA}}$), $I^2R$ corridor copper losses, short-horizon demand forecast error, and Lithium Iron Phosphate (LFP) battery Coulomb counting across a 6-node Kenyan distribution corridor at 1.5-second intervals.
 2. **Core control and algorithmic subsystems (`backend/core_subsystems.py` & `backend/database.py`):** Executes graph-based power routing, hierarchical zone rollups, pluggable inverter dispatch strategies, mutex-synchronized circular frame buffering, 64-bit bitwise telemetry encoding with CRC-8 verification, propositional breaker safety checks, and transactional SQL persistence.
-3. **Dual-mode operator control center (`frontend/src/App.tsx`):** Provides a 4-tab real-time SCADA interface over full-duplex WebSockets (`ws://localhost:8000/ws`) and REST control endpoints, paired with an autonomous client-side edge digital twin fallback for zero-dependency static deployments.
+3. **Minimalist SCADA operator console (`frontend/src/App.tsx`):** Provides a hairline-grid utility HMI with an interactive IEEE Single-Line Diagram (SLD), clickable asset & 64-bit RTU register inspector, dense tabular telemetry matrix, and dual-channel strip chart recorder over full-duplex WebSockets (`ws://localhost:8000/ws`) with an autonomous client-side fallback engine.
 
 ---
 

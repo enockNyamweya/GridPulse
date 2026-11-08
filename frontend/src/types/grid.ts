@@ -39,6 +39,12 @@ export interface GridMetrics {
   total_demand_kw: number;
   transformer_load_pct: number;
   transformer_temp_c: number;
+  winding_hotspot_c?: number;
+  thermal_aging_factor?: number;
+  forecast_demand_kw?: number;
+  forecast_error_pct?: number;
+  corridor_losses_kw?: number;
+  pcc_breaker_closed?: boolean;
   bess_soc_pct: number;
   bess_dispatch_kw: number;
   clinic_uptime_pct: number;

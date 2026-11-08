@@ -225,6 +225,16 @@ class MicrogridSimulator:
         target_temp = 34.0 + ((transformer_load_pct / 100.0) ** 1.7) * 52.0
         self.transformer_temp_c = (self.transformer_temp_c * 0.82) + (target_temp * 0.18)
 
+        load_ratio_k = transformer_load_pct / 100.0
+        winding_gradient_c = 22.0 * (load_ratio_k ** 1.6)
+        winding_hotspot_c = self.transformer_temp_c + winding_gradient_c
+        import math
+        thermal_aging_factor = math.exp((15000.0 / 383.0) - (15000.0 / (winding_hotspot_c + 273.0)))
+
+        baseline_forecast_kw = 348.0 if self.active_scenario == "NOMINAL" else 365.0
+        forecast_error_pct = ((unmitigated_demand - baseline_forecast_kw) / baseline_forecast_kw) * 100.0
+        corridor_losses_kw = round(4.2 + (load_ratio_k ** 2) * 14.5, 1)
+
         nodes: List[Dict[str, Any]] = [
             {
                 "node_id": "GEN-OLK-01",
@@ -388,6 +398,12 @@ class MicrogridSimulator:
                 "total_demand_kw": round(total_demand_kw, 1),
                 "transformer_load_pct": round(transformer_load_pct, 1),
                 "transformer_temp_c": round(self.transformer_temp_c, 1),
+                "winding_hotspot_c": round(winding_hotspot_c, 1),
+                "thermal_aging_factor": round(thermal_aging_factor, 3),
+                "forecast_demand_kw": round(baseline_forecast_kw, 1),
+                "forecast_error_pct": round(forecast_error_pct, 1),
+                "corridor_losses_kw": corridor_losses_kw,
+                "pcc_breaker_closed": upstream_online,
                 "bess_soc_pct": round(self.bess_soc_pct, 1),
                 "bess_dispatch_kw": round(self.bess_dispatch_kw, 1),
                 "clinic_uptime_pct": 100.0,
