@@ -2,6 +2,8 @@
 
 **Smart grid digital telemetry, transformer overload protection, and automated Battery Energy Storage System (BESS) coordination engine for distribution microgrids.**
 
+**Live deployment:** [https://gridpulse-ea.netlify.app](https://gridpulse-ea.netlify.app)
+
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0284c7?style=flat-square)
 ![FastAPI](https://img.shields.io/badge/FastAPI-WebSocket_%2B_REST-059669?style=flat-square)
 ![SQLite](https://img.shields.io/badge/SQLite-WAL_ACID_Ledger-2563eb?style=flat-square)
