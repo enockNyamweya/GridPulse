@@ -32,9 +32,9 @@ GridPulse is structured across three decoupled operational tiers:
 
 1. **Field telemetry and physics simulation layer ([`backend/simulator.py`](backend/simulator.py)):** Computes real-time 50.00 Hz frequency droop, secondary bus voltage regulation, IEC 60076-7 transformer top-oil ($\Theta_{\text{oil}}$) and winding hot-spot ($\Theta_{\text{hs}}$) temperatures, Arrhenius relative thermal aging acceleration ($F_{\text{AA}}$), $I^2R$ corridor copper losses, short-horizon demand forecast deviation, and Lithium Iron Phosphate (LFP) battery Coulomb counting across a 6-node Kenyan distribution corridor at 1.5-second intervals.
 2. **Core control and algorithmic subsystems ([`backend/core_subsystems.py`](backend/core_subsystems.py) & [`backend/database.py`](backend/database.py)):** Executes graph-based power routing, hierarchical zone rollups, pluggable inverter dispatch strategies, mutex-synchronized circular frame buffering, 64-bit bitwise telemetry encoding with CRC-8 verification, propositional breaker safety checks, and transactional SQL persistence.
-3. **Accessible operator and consumer interface ([`frontend/src/App.tsx`](frontend/src/App.tsx)):** Provides a calm, minimalist monochrome interface organized into five views:
-   * **`Backup planner` (For homeowners, clinics, and small businesses):** An interactive blackout survival calculator where everyday users can select presets (*Home or Apartment*, *Health Clinic*, *Small Business / Cold Room*) or enter their own essential loads, heavy equipment, solar panel wattage, battery capacity, and blackout duration to compare survival hours with and without smart load-shedding, minimum required battery sizing, and diesel generator fuel savings (`KES` / `Liters`).
-   * **`Live corridor`, `Topology`, `Dispatch`, and `Protocol`:** Full-corridor microgrid telemetry with plain-English state explanations, Dijkstra shortest-loss clinic routing, Prim radial spanning tree tables, BESS control profiles, and 64-bit RTU binary frame inspection.
+3. **Strictly separated dual-workspace frontend ([`frontend/src/App.tsx`](frontend/src/App.tsx)):** Built with a minimalist monochrome design split into two completely independent workspaces so everyday users never accidentally land in technical telemetry tables:
+   * **Workspace A: Consumer Blackout & Solar Backup Planner (Default view):** A zero-jargon tool for homeowners, rural health clinics, and small business owners. Visitors select a profile (**Home**, **Health clinic**, or **Small business**), tap the actual appliances they use (*LED lighting*, *Wi-Fi & laptops*, *Household fridge*, *Medical vaccine refrigerator*, *Oxygen concentrator*, *Water heater*, *Borehole pump*, *Grain mill*), and set their battery (`kWh`), solar (`kW`), inverter (`kW`), and blackout duration (`hours`). The planner compares blackout survival hours **without** vs. **with GridPulse smart load-shedding**, recommends minimum battery and inverter sizing, and estimates diesel generator fuel and cost savings (`Liters` and `KES`).
+   * **Workspace B: Grid Operator & Engineering Console (Isolated engineer view):** Accessible via the footer workspace switch (`Grid operator & engineering console`), providing a dedicated 4-tab technical interface (`Overview`, `Topology`, `Dispatch`, `Protocol`) over full-duplex WebSockets (`ws://localhost:8000/ws`) or the built-in browser simulation engine.
 
 ---
 
@@ -188,7 +188,7 @@ gridpulse/
     ├── tailwind.config.js
     └── src/
         ├── main.tsx            # React 18 root mount
-        ├── App.tsx             # Minimalist 4-view operator interface + client-side simulation engine
+        ├── App.tsx             # Dual-workspace UI: Consumer Backup Planner + Operator Console
         ├── index.css           # Typography (Inter + JetBrains Mono) and tabular-num rules
         └── types/
             └── grid.ts         # TypeScript interfaces for telemetry, nodes, and subsystems
@@ -213,7 +213,7 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 When started, the backend automatically initializes `backend/gridpulse.db` in SQLite WAL mode, seeds the 6 Kenyan grid assets, and begins streaming 1.5-second telemetry ticks at `ws://localhost:8000/ws`.
 
-### 2. Start the React operator interface
+### 2. Start the frontend application
 
 ```bash
 cd frontend
@@ -223,5 +223,5 @@ npm run dev
 
 Open `http://localhost:5173` in your browser:
 
-* When the FastAPI backend is running locally on port `8000`, the header indicator displays `Live` (connected via WebSocket to FastAPI and SQLite WAL).
-* When deployed statically (such as on [https://gridpulse-ea.netlify.app](https://gridpulse-ea.netlify.app)), the header indicator displays `Simulated`, executing the full physics, graph routing, bitwise RTU framing, and safety interlock algorithms directly in the browser.
+* **Default view (Consumer Backup Planner):** Opens directly into the zero-jargon appliance and solar/battery blackout survival planner for **Home**, **Health clinic**, and **Small business** users.
+* **Operator & Engineering Console:** Click `Grid operator & engineering console` in the footer to enter the dedicated technical workspace (`Overview`, `Topology`, `Dispatch`, `Protocol`). When the FastAPI backend is running locally on port `8000`, the console header displays `Live`; when hosted statically on [https://gridpulse-ea.netlify.app](https://gridpulse-ea.netlify.app), it displays `Simulated` and runs the full physics and protocol engine in the browser.
