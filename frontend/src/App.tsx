@@ -376,6 +376,13 @@ export default function App() {
   });
 
   useEffect(() => {
+    const isLocalHost =
+      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocalHost) {
+      setBackendConnected(false);
+      return;
+    }
+
     let ws: WebSocket | null = null;
     try {
       ws = new WebSocket('ws://localhost:8000/ws');
