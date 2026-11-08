@@ -6,107 +6,95 @@ import {
   ZoneHierarchyNode,
 } from './types/grid';
 
+// ============================================================================
+// CONSUMER MODE DATA (100% HUMAN-CENTRIC, ZERO JARGON)
+// ============================================================================
+
+interface ApplianceItem {
+  id: string;
+  name: string;
+  watts: number;
+  category: 'essential' | 'heavy';
+  defaultOnFor: Array<'home' | 'clinic' | 'business'>;
+}
+
+const APPLIANCES: ApplianceItem[] = [
+  // Essential (Keep running during blackout)
+  { id: 'lights', name: 'LED lighting (8 rooms)', watts: 80, category: 'essential', defaultOnFor: ['home', 'clinic', 'business'] },
+  { id: 'wifi', name: 'Wi-Fi router, phones & laptops', watts: 90, category: 'essential', defaultOnFor: ['home', 'clinic', 'business'] },
+  { id: 'fridge', name: 'Household fridge / freezer', watts: 180, category: 'essential', defaultOnFor: ['home'] },
+  { id: 'tv', name: 'TV & decoder', watts: 120, category: 'essential', defaultOnFor: ['home'] },
+  { id: 'security', name: 'Security cameras & gate', watts: 70, category: 'essential', defaultOnFor: ['home', 'clinic', 'business'] },
+  { id: 'vaccine', name: 'Medical vaccine refrigerator', watts: 320, category: 'essential', defaultOnFor: ['clinic'] },
+  { id: 'oxygen', name: 'Oxygen concentrator & monitors', watts: 550, category: 'essential', defaultOnFor: ['clinic'] },
+  { id: 'incubator', name: 'Maternity ward incubator & lights', watts: 480, category: 'essential', defaultOnFor: ['clinic'] },
+  { id: 'coldroom', name: 'Commercial cold-room chiller', watts: 2200, category: 'essential', defaultOnFor: ['business'] },
+  { id: 'pos', name: 'POS computers & digital scales', watts: 200, category: 'essential', defaultOnFor: ['business'] },
+
+  // Heavy / Flexible (Automatically paused by GridPulse during blackouts)
+  { id: 'kettle', name: 'Electric kettle', watts: 1800, category: 'heavy', defaultOnFor: ['home'] },
+  { id: 'heater', name: 'Water heater / geyser', watts: 2500, category: 'heavy', defaultOnFor: ['home', 'clinic'] },
+  { id: 'iron', name: 'Clothes iron / microwave', watts: 1200, category: 'heavy', defaultOnFor: ['home'] },
+  { id: 'pump', name: 'Borehole / booster water pump', watts: 1500, category: 'heavy', defaultOnFor: ['home', 'clinic', 'business'] },
+  { id: 'autoclave', name: 'Clinic sterilizer (autoclave)', watts: 2000, category: 'heavy', defaultOnFor: ['clinic'] },
+  { id: 'ac', name: 'Air conditioning unit', watts: 1600, category: 'heavy', defaultOnFor: ['clinic', 'business'] },
+  { id: 'mill', name: 'Grain / posho mill motor', watts: 3500, category: 'heavy', defaultOnFor: ['business'] },
+  { id: 'welder', name: 'Workshop compressor / machinery', watts: 2400, category: 'heavy', defaultOnFor: ['business'] },
+];
+
+const PROFILE_DEFAULTS = {
+  home: {
+    label: 'Home',
+    subtitle: 'Lights, fridge, Wi-Fi, water heater & kitchen appliances',
+    batteryKwh: 5,
+    solarKw: 3,
+    inverterKw: 3.5,
+    outageHours: 5,
+  },
+  clinic: {
+    label: 'Health clinic',
+    subtitle: 'Vaccine chiller, oxygen, maternity lights, pump & sterilizer',
+    batteryKwh: 15,
+    solarKw: 8,
+    inverterKw: 8,
+    outageHours: 6,
+  },
+  business: {
+    label: 'Small business',
+    subtitle: 'Cold storage, POS, borehole pump & processing machinery',
+    batteryKwh: 30,
+    solarKw: 15,
+    inverterKw: 15,
+    outageHours: 6,
+  },
+};
+
+// ============================================================================
+// OPERATOR CONSOLE DATA (ISOLATED IN ENGINEER WORKSPACE)
+// ============================================================================
+
 const SCENARIOS = [
-  {
-    id: 'NOMINAL',
-    label: 'Normal day',
-    plainExplanation:
-      'Main grid and local solar are healthy. Extra solar energy is quietly charging the battery bank, and all community loads are running at 100%.',
-  },
-  {
-    id: 'EVENING_PEAK',
-    label: 'Evening peak surge',
-    plainExplanation:
-      'The sun has set and businesses + homes are drawing heavy power at the same time. GridPulse discharges the battery and trims non-essential machinery by 28% so the neighborhood transformer does not overheat and blow.',
-  },
-  {
-    id: 'CLOUD_TRANSIENT',
-    label: 'Sudden cloud cover',
-    plainExplanation:
-      'Thick clouds just dropped solar output by 80%. GridPulse instantly fills the gap from the battery bank so voltage does not sag or damage clinic equipment.',
-  },
-  {
-    id: 'UPSTREAM_BLACKOUT',
-    label: 'Main grid blackout',
-    plainExplanation:
-      'The national utility grid went completely dead. GridPulse isolated the neighborhood, paused 45% of heavy commercial machinery, and is running the clinic 100% on local solar and battery power.',
-  },
+  { id: 'NOMINAL', label: 'Nominal' },
+  { id: 'EVENING_PEAK', label: 'Evening peak' },
+  { id: 'CLOUD_TRANSIENT', label: 'Cloud cover' },
+  { id: 'UPSTREAM_BLACKOUT', label: 'Grid outage' },
 ];
 
 const STRATEGIES = [
   {
     id: 'PROPORTIONAL_DROOP',
-    name: 'Balanced protection (Default)',
-    summary:
-      'Uses the battery first during evening peaks and only trims heavy commercial machinery if transformer load still exceeds 88%.',
+    name: 'Proportional droop',
+    summary: 'Balances battery peak shaving with commercial load curtailment above 88% transformer load.',
   },
   {
     id: 'AGGRESSIVE_PEAK_SHAVING',
-    name: 'Maximum transformer life',
-    summary:
-      'Caps transformer load strictly at 68% (340 kW) using battery power to keep the transformer cool and extend its lifespan.',
+    name: 'Aggressive peak shaving',
+    summary: 'Caps transformer loading at 68% (340 kW) to minimize winding hot-spot thermal aging.',
   },
   {
     id: 'CONSERVATIVE_CLINIC_RESERVE',
-    name: 'Save battery for blackouts',
-    summary:
-      'Trims flexible commercial load early during peaks so the battery stays near full charge in case a total blackout hits at night.',
-  },
-];
-
-interface UserPreset {
-  id: string;
-  label: string;
-  subtitle: string;
-  essentialKw: number;
-  essentialDesc: string;
-  flexibleKw: number;
-  flexibleDesc: string;
-  solarKw: number;
-  batteryKwh: number;
-  inverterMaxKw: number;
-  outageHours: number;
-}
-
-const USER_PRESETS: UserPreset[] = [
-  {
-    id: 'home',
-    label: 'Home or Apartment',
-    subtitle: 'Typical 3-bedroom home with backup inverter',
-    essentialKw: 0.6,
-    essentialDesc: 'Fridge, Wi-Fi router, LED lights, laptops, TV',
-    flexibleKw: 2.2,
-    flexibleDesc: 'Water heater, kettle, iron box, microwave, washing machine',
-    solarKw: 3.0,
-    batteryKwh: 5.0,
-    inverterMaxKw: 3.0,
-    outageHours: 5,
-  },
-  {
-    id: 'clinic',
-    label: 'Health Clinic',
-    subtitle: 'Rural maternity & outpatient clinic',
-    essentialKw: 3.2,
-    essentialDesc: 'Vaccine fridge, oxygen concentrator, maternity ward lights, lab',
-    flexibleKw: 5.5,
-    flexibleDesc: 'Borehole water pump, autoclave sterilizer, office AC, laundry',
-    solarKw: 10.0,
-    batteryKwh: 20.0,
-    inverterMaxKw: 10.0,
-    outageHours: 6,
-  },
-  {
-    id: 'sme',
-    label: 'Small Business / Cold Room',
-    subtitle: 'Agro-processing hub, dairy chiller, or workshop',
-    essentialKw: 6.5,
-    essentialDesc: 'Cold-storage room compressor, digital scales, security & POS',
-    flexibleKw: 14.0,
-    flexibleDesc: 'Maize/grain mill, welding bay, ice-block maker, EV chargers',
-    solarKw: 20.0,
-    batteryKwh: 40.0,
-    inverterMaxKw: 20.0,
-    outageHours: 6,
+    name: 'Clinic reserve',
+    summary: 'Preserves battery charge for extended blackouts by curtailing flexible commercial load first.',
   },
 ];
 
@@ -422,48 +410,63 @@ function createInitialSnapshot(): TelemetrySnapshot {
 function formatStateLabel(state: string): string {
   switch (state) {
     case 'STABLE':
-      return 'Healthy';
+      return 'Nominal';
     case 'BESS_DISPATCH_ACTIVE':
-      return 'Battery assisting';
+      return 'Battery dispatch';
     case 'DEMAND_RESPONSE_SHED':
-      return 'Load-shedding active';
+      return 'Demand response';
     case 'FAULT_ISLANDING':
-      return 'Running on backup island';
+      return 'Islanded';
     default:
-      return 'Overload warning';
+      return 'Unprotected overload';
   }
 }
 
 export default function App() {
+  // STRICT SEPARATION OF MODES:
+  // 'consumer' = Clean, self-contained everyday tool (zero engineering graphs or hex dumps)
+  // 'operator' = Dedicated engineering & utility SCADA console
+  const [workspaceMode, setWorkspaceMode] = useState<'consumer' | 'operator'>('consumer');
+
+  // Consumer Workspace State
+  const [profileKey, setProfileKey] = useState<'home' | 'clinic' | 'business'>('home');
+  const [selectedAppliances, setSelectedAppliances] = useState<string[]>(
+    APPLIANCES.filter((a) => a.defaultOnFor.includes('home')).map((a) => a.id)
+  );
+  const [batteryKwh, setBatteryKwh] = useState<number>(PROFILE_DEFAULTS.home.batteryKwh);
+  const [solarKw, setSolarKw] = useState<number>(PROFILE_DEFAULTS.home.solarKw);
+  const [inverterKw, setInverterKw] = useState<number>(PROFILE_DEFAULTS.home.inverterKw);
+  const [outageHours, setOutageHours] = useState<number>(PROFILE_DEFAULTS.home.outageHours);
+  const [outageCondition, setOutageCondition] = useState<'night' | 'cloudy' | 'sunny'>('night');
+
+  const chooseConsumerProfile = (key: 'home' | 'clinic' | 'business') => {
+    setProfileKey(key);
+    const def = PROFILE_DEFAULTS[key];
+    setBatteryKwh(def.batteryKwh);
+    setSolarKw(def.solarKw);
+    setInverterKw(def.inverterKw);
+    setOutageHours(def.outageHours);
+    setSelectedAppliances(
+      APPLIANCES.filter((a) => a.defaultOnFor.includes(key)).map((a) => a.id)
+    );
+  };
+
+  const toggleAppliance = (id: string) => {
+    setSelectedAppliances((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  // Operator Console State
   const [snapshot, setSnapshot] = useState<TelemetrySnapshot>(createInitialSnapshot);
   const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [history, setHistory] = useState<Array<{ freq: number; load: number }>>([
     { freq: 50.0, load: 69.6 },
   ]);
-  const [activeTab, setActiveTab] = useState<
-    'planner' | 'overview' | 'topology' | 'dispatch' | 'protocol'
-  >('planner');
+  const [operatorTab, setOperatorTab] = useState<
+    'overview' | 'topology' | 'dispatch' | 'protocol'
+  >('overview');
   const [selectedNodeId, setSelectedNodeId] = useState<string>('TR-NRB-04');
-
-  // Personal Backup & Solar Planner State (Accessible to everyday users)
-  const [presetId, setPresetId] = useState<string>('clinic');
-  const [essentialKw, setEssentialKw] = useState<number>(3.2);
-  const [flexibleKw, setFlexibleKw] = useState<number>(5.5);
-  const [solarKw, setSolarKw] = useState<number>(10.0);
-  const [batteryKwh, setBatteryKwh] = useState<number>(20.0);
-  const [inverterMaxKw, setInverterMaxKw] = useState<number>(10.0);
-  const [outageHours, setOutageHours] = useState<number>(6);
-  const [outageTime, setOutageTime] = useState<'night' | 'cloudy' | 'sunny'>('night');
-
-  const selectPreset = (p: UserPreset) => {
-    setPresetId(p.id);
-    setEssentialKw(p.essentialKw);
-    setFlexibleKw(p.flexibleKw);
-    setSolarKw(p.solarKw);
-    setBatteryKwh(p.batteryKwh);
-    setInverterMaxKw(p.inverterMaxKw);
-    setOutageHours(p.outageHours);
-  };
 
   const localSimRef = useRef({
     scenario: 'NOMINAL',
@@ -510,7 +513,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (backendConnected) return;
+    if (backendConnected || workspaceMode !== 'operator') return;
 
     const timer = setInterval(() => {
       setSnapshot((prev) => {
@@ -789,7 +792,7 @@ export default function App() {
     }, 1500);
 
     return () => clearInterval(timer);
-  }, [backendConnected]);
+  }, [backendConnected, workspaceMode]);
 
   const triggerScenario = async (scenarioId: string) => {
     localSimRef.current.scenario = scenarioId;
@@ -837,6 +840,440 @@ export default function App() {
     }
   };
 
+  // ============================================================================
+  // CONSUMER MODE CALCULATIONS
+  // ============================================================================
+  const activeEssentialWatts = APPLIANCES.filter(
+    (a) => a.category === 'essential' && selectedAppliances.includes(a.id)
+  ).reduce((sum, a) => sum + a.watts, 0);
+
+  const activeHeavyWatts = APPLIANCES.filter(
+    (a) => a.category === 'heavy' && selectedAppliances.includes(a.id)
+  ).reduce((sum, a) => sum + a.watts, 0);
+
+  const essentialKw = Math.max(0.05, Number((activeEssentialWatts / 1000).toFixed(2)));
+  const heavyKw = Number((activeHeavyWatts / 1000).toFixed(2));
+  const totalUnprotectedKw = Number((essentialKw + heavyKw).toFixed(2));
+
+  const usableBatteryKwh = batteryKwh * 0.85;
+  const solarFactor =
+    outageCondition === 'night' ? 0.0 : outageCondition === 'cloudy' ? 0.22 : 0.65;
+  const availableSolarKw = Number((solarKw * solarFactor).toFixed(2));
+
+  // Standard Inverter (No automatic load shedding)
+  const stdOverloaded = totalUnprotectedKw > inverterKw;
+  const stdNetDrainKw = Math.max(0.05, totalUnprotectedKw - availableSolarKw);
+  const stdHours = stdOverloaded ? 0 : usableBatteryKwh / stdNetDrainKw;
+  const stdSurvives = !stdOverloaded && stdHours >= outageHours;
+
+  // With GridPulse Automatic Load Shedding (Pauses heavy appliances during blackout)
+  const gpOverloaded = essentialKw > inverterKw;
+  const gpNetDrainKw = Math.max(0.05, essentialKw - availableSolarKw);
+  const gpHours = gpOverloaded
+    ? 0
+    : essentialKw <= availableSolarKw
+    ? 24
+    : usableBatteryKwh / gpNetDrainKw;
+  const gpSurvives = !gpOverloaded && gpHours >= outageHours;
+
+  const recommendedBatteryKwh = Math.max(
+    1,
+    Math.ceil((Math.max(0.05, essentialKw - availableSolarKw) * outageHours) / 0.85)
+  );
+  const recommendedInverterKw = Math.max(1, Math.ceil(essentialKw * 1.25));
+  const dieselSavedLiters = Number((essentialKw * outageHours * 0.42).toFixed(1));
+  const kesSaved = Math.round(dieselSavedLiters * 185);
+
+  // ============================================================================
+  // RENDER 1: CONSUMER EXPERIENCE (DEFAULT — ZERO TECHNICAL GRAPHS OR JARGON)
+  // ============================================================================
+  if (workspaceMode === 'consumer') {
+    return (
+      <div className="min-h-screen bg-[#09090b] text-zinc-100 antialiased flex flex-col justify-between">
+        <div className="max-w-4xl w-full mx-auto px-6 py-10">
+          {/* MINIMAL CONSUMER HEADER */}
+          <header className="flex items-center justify-between pb-8 border-b border-zinc-800/80">
+            <div>
+              <span className="text-base font-medium tracking-tight text-zinc-100">
+                GridPulse
+              </span>
+              <span className="mx-2.5 text-zinc-700">/</span>
+              <span className="text-xs text-zinc-400">
+                Blackout Survival &amp; Solar Backup Planner
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs">
+              {(
+                [
+                  ['home', 'Home'],
+                  ['clinic', 'Health clinic'],
+                  ['business', 'Small business'],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => chooseConsumerProfile(key)}
+                  className={`px-3 py-1.5 rounded transition-colors ${
+                    profileKey === key
+                      ? 'bg-zinc-100 text-zinc-950 font-medium'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </header>
+
+          {/* OUTCOME BANNER (THE MAIN QUESTION ANSWERED IMMEDIATELY) */}
+          <section className="py-8 border-b border-zinc-800/60">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* WITHOUT SMART PROTECTION */}
+              <div className="p-6 rounded-md border border-zinc-800/90 bg-zinc-950/40 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-400">Standard backup (everything stays on)</span>
+                    <span
+                      className={`font-mono text-[11px] ${
+                        stdSurvives ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    >
+                      {stdOverloaded
+                        ? 'Inverter trips off'
+                        : stdSurvives
+                        ? 'Lasts full blackout'
+                        : 'Battery dies early'}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 text-3xl font-mono font-normal tracking-tight text-zinc-100 tabular-nums">
+                    {stdOverloaded ? (
+                      <span className="text-rose-400">0.0 hours</span>
+                    ) : (
+                      <>
+                        {Math.min(24, stdHours).toFixed(1)}{' '}
+                        <span className="text-base text-zinc-500">hours</span>
+                      </>
+                    )}
+                  </div>
+
+                  <p className="mt-3 text-xs text-zinc-400 leading-relaxed">
+                    {stdOverloaded
+                      ? `Your selected appliances draw ${totalUnprotectedKw} kW, which is higher than your ${inverterKw} kW inverter limit. The system shuts down immediately.`
+                      : stdSurvives
+                      ? `Your ${batteryKwh} kWh battery can run all ${totalUnprotectedKw} kW of appliances for the full ${outageHours}-hour outage.`
+                      : `Running heavy appliances alongside essential ones (${totalUnprotectedKw} kW total) drains your battery in ${stdHours.toFixed(1)} hours, leaving you without power for ${(outageHours - stdHours).toFixed(1)} hours.`}
+                  </p>
+                </div>
+
+                {/* Visual survival bar */}
+                <div className="mt-5">
+                  <div className="flex justify-between text-[11px] text-zinc-500 mb-1.5 font-mono">
+                    <span>Coverage of {outageHours}-hour blackout</span>
+                    <span>
+                      {Math.min(100, Math.round((stdHours / outageHours) * 100))}%
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-900 rounded overflow-hidden">
+                    <div
+                      className={`h-full ${stdSurvives ? 'bg-zinc-300' : 'bg-rose-500'}`}
+                      style={{
+                        width: `${Math.min(100, Math.round((stdHours / outageHours) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* WITH GRIDPULSE SMART LOAD SHEDDING */}
+              <div className="p-6 rounded-md border border-zinc-700 bg-zinc-900/30 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-100 font-medium">
+                      With GridPulse smart load-shedding
+                    </span>
+                    <span
+                      className={`font-mono text-[11px] ${
+                        gpSurvives ? 'text-emerald-400' : 'text-amber-400'
+                      }`}
+                    >
+                      {gpOverloaded
+                        ? 'Inverter too small'
+                        : gpSurvives
+                        ? 'Survives 100%'
+                        : 'Needs bigger battery'}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 text-3xl font-mono font-normal tracking-tight text-emerald-400 tabular-nums">
+                    {gpOverloaded ? (
+                      <span className="text-rose-400">0.0 hours</span>
+                    ) : gpHours >= 24 ? (
+                      <>
+                        24+ <span className="text-base text-zinc-400">hours</span>
+                      </>
+                    ) : (
+                      <>
+                        {gpHours.toFixed(1)}{' '}
+                        <span className="text-base text-zinc-400">hours</span>
+                      </>
+                    )}
+                  </div>
+
+                  <p className="mt-3 text-xs text-zinc-300 leading-relaxed">
+                    {gpOverloaded
+                      ? `Your essential equipment alone (${essentialKw} kW) exceeds your ${inverterKw} kW inverter. Use at least a ${recommendedInverterKw} kW inverter.`
+                      : gpSurvives
+                      ? `GridPulse automatically pauses ${heavyKw} kW of heavy appliances when the grid goes off, keeping your ${essentialKw} kW of essential equipment running for the entire ${outageHours}-hour blackout.`
+                      : `Pausing heavy appliances stretches your battery from ${stdHours.toFixed(1)} hrs to ${gpHours.toFixed(1)} hrs. To cover all ${outageHours} hours, use at least a ${recommendedBatteryKwh} kWh battery.`}
+                  </p>
+                </div>
+
+                {/* Visual survival bar */}
+                <div className="mt-5">
+                  <div className="flex justify-between text-[11px] text-zinc-400 mb-1.5 font-mono">
+                    <span>Coverage of {outageHours}-hour blackout</span>
+                    <span>
+                      {Math.min(100, Math.round((gpHours / outageHours) * 100))}%
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-900 rounded overflow-hidden">
+                    <div
+                      className={`h-full ${gpSurvives ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                      style={{
+                        width: `${Math.min(100, Math.round((gpHours / outageHours) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* STEP 1 & STEP 2: TAP YOUR APPLIANCES + ADJUST BATTERY/SOLAR */}
+          <section className="py-8 grid grid-cols-1 lg:grid-cols-12 gap-10 border-b border-zinc-800/60">
+            {/* LEFT 7 COLS: TAP APPLIANCES */}
+            <div className="lg:col-span-7 space-y-6">
+              <div>
+                <h2 className="text-xs font-medium text-zinc-200">
+                  1. Tap the appliances you use
+                </h2>
+                <p className="text-[11px] text-zinc-500 mt-0.5">
+                  No need to calculate watts manually. Select what you have on site.
+                </p>
+              </div>
+
+              {/* Essential Appliances */}
+              <div>
+                <div className="flex justify-between text-xs text-zinc-400 mb-2.5">
+                  <span>Essential (kept ON during blackouts)</span>
+                  <span className="font-mono text-zinc-200">{essentialKw} kW total</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {APPLIANCES.filter((a) => a.category === 'essential').map((item) => {
+                    const checked = selectedAppliances.includes(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => toggleAppliance(item.id)}
+                        className={`px-3 py-2.5 rounded border text-left text-xs flex items-center justify-between transition-colors ${
+                          checked
+                            ? 'border-zinc-300 bg-zinc-900 text-zinc-100'
+                            : 'border-zinc-800/70 text-zinc-500 hover:border-zinc-700'
+                        }`}
+                      >
+                        <span className="truncate pr-2">{item.name}</span>
+                        <span className="font-mono text-[11px] text-zinc-400 shrink-0">
+                          {item.watts}W
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Heavy Appliances */}
+              <div>
+                <div className="flex justify-between text-xs text-zinc-400 mb-2.5">
+                  <span>Heavy appliances (paused automatically during blackouts)</span>
+                  <span className="font-mono text-zinc-400">{heavyKw} kW total</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {APPLIANCES.filter((a) => a.category === 'heavy').map((item) => {
+                    const checked = selectedAppliances.includes(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => toggleAppliance(item.id)}
+                        className={`px-3 py-2.5 rounded border text-left text-xs flex items-center justify-between transition-colors ${
+                          checked
+                            ? 'border-zinc-600 bg-zinc-900/50 text-zinc-200'
+                            : 'border-zinc-800/70 text-zinc-500 hover:border-zinc-700'
+                        }`}
+                      >
+                        <span className="truncate pr-2">{item.name}</span>
+                        <span className="font-mono text-[11px] text-zinc-500 shrink-0">
+                          {item.watts}W
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT 5 COLS: BATTERY, SOLAR & OUTAGE SLIDERS */}
+            <div className="lg:col-span-5 space-y-6">
+              <div>
+                <h2 className="text-xs font-medium text-zinc-200">
+                  2. Your battery, solar &amp; outage length
+                </h2>
+                <p className="text-[11px] text-zinc-500 mt-0.5">
+                  Test what you currently own or what you plan to buy.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-zinc-300">Battery size</span>
+                    <span className="font-mono text-zinc-100 tabular-nums">
+                      {batteryKwh} kWh
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="60"
+                    step="1"
+                    value={batteryKwh}
+                    onChange={(e) => setBatteryKwh(parseFloat(e.target.value))}
+                    className="w-full accent-zinc-100 bg-zinc-800 h-1.5 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-zinc-300">Solar panels installed</span>
+                    <span className="font-mono text-zinc-100 tabular-nums">{solarKw} kW</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="30"
+                    step="0.5"
+                    value={solarKw}
+                    onChange={(e) => setSolarKw(parseFloat(e.target.value))}
+                    className="w-full accent-zinc-100 bg-zinc-800 h-1.5 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-zinc-300">Inverter size</span>
+                    <span className="font-mono text-zinc-100 tabular-nums">
+                      {inverterKw} kW
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="30"
+                    step="0.5"
+                    value={inverterKw}
+                    onChange={(e) => setInverterKw(parseFloat(e.target.value))}
+                    className="w-full accent-zinc-100 bg-zinc-800 h-1.5 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-zinc-300">How long does the blackout last?</span>
+                    <span className="font-mono text-zinc-100 tabular-nums">
+                      {outageHours} hours
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="12"
+                    step="1"
+                    value={outageHours}
+                    onChange={(e) => setOutageHours(parseInt(e.target.value, 10))}
+                    className="w-full accent-zinc-100 bg-zinc-800 h-1.5 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div className="pt-1 space-y-2">
+                  <div className="text-xs text-zinc-400">Time of blackout</div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    {(
+                      [
+                        ['night', 'Night'],
+                        ['cloudy', 'Cloudy day'],
+                        ['sunny', 'Sunny day'],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        onClick={() => setOutageCondition(id)}
+                        className={`py-1.5 rounded border transition-colors ${
+                          outageCondition === id
+                            ? 'border-zinc-200 bg-zinc-100 text-zinc-950 font-medium'
+                            : 'border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* CLEAR SHOPPING / SIZING RECOMMENDATION BOX */}
+              <div className="p-4 rounded-md border border-zinc-800 bg-zinc-950/60 space-y-3 text-xs">
+                <div className="font-medium text-zinc-200">
+                  Recommended setup for your selected appliances
+                </div>
+                <div className="space-y-2 text-zinc-400">
+                  <div className="flex justify-between">
+                    <span>Minimum battery for {outageHours}h backup</span>
+                    <span className="font-mono text-zinc-100">{recommendedBatteryKwh} kWh</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Minimum inverter size</span>
+                    <span className="font-mono text-zinc-100">{recommendedInverterKw} kW</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Generator fuel saved per blackout</span>
+                    <span className="font-mono text-emerald-400">
+                      {dieselSavedLiters} L (~KES {kesSaved.toLocaleString()})
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* QUIET FOOTER WITH SEPARATE LINK TO OPERATOR / ENGINEER CONSOLE */}
+        <footer className="max-w-4xl w-full mx-auto px-6 py-6 border-t border-zinc-900 flex items-center justify-between text-[11px] text-zinc-600">
+          <span>GridPulse Open-Source Microgrid &amp; Backup Protection</span>
+          <button
+            onClick={() => setWorkspaceMode('operator')}
+            className="text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            Grid operator &amp; engineering console →
+          </button>
+        </footer>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // RENDER 2: DEDICATED OPERATOR & ENGINEERING CONSOLE (COMPLETELY SEPARATED)
+  // ============================================================================
   const { metrics, system_state, active_scenario, auto_balancer_enabled, subsystems } = snapshot;
   const hospitalRoute = subsystems?.network_routing.hospital_route.path ?? [
     'GEN-OLK-01',
@@ -859,76 +1296,35 @@ export default function App() {
   const selectedNode =
     snapshot.nodes.find((n) => n.node_id === selectedNodeId) ?? snapshot.nodes[2];
 
-  // Personal Backup & Solar Calculator Physics
-  const usableBatteryKwh = batteryKwh * 0.85; // 85% usable LFP depth of discharge
-  const solarFactor = outageTime === 'night' ? 0.0 : outageTime === 'cloudy' ? 0.22 : 0.65;
-  const availableSolarKw = solarKw * solarFactor;
-
-  // 1. Without GridPulse (Unmanaged: all appliances stay on)
-  const unmanagedTotalKw = essentialKw + flexibleKw;
-  const unmanagedNetDrainKw = Math.max(0.05, unmanagedTotalKw - availableSolarKw);
-  const unmanagedInverterOverloaded = unmanagedTotalKw > inverterMaxKw;
-  const unmanagedHours = unmanagedInverterOverloaded
-    ? 0.0
-    : usableBatteryKwh / unmanagedNetDrainKw;
-  const unmanagedSurvives = !unmanagedInverterOverloaded && unmanagedHours >= outageHours;
-
-  // 2. With GridPulse Smart Load-Shedding (Automatically pauses flexible loads during blackout)
-  const smartTotalKw =
-    availableSolarKw >= essentialKw + flexibleKw
-      ? essentialKw + flexibleKw
-      : essentialKw; // Only powers flexible loads if solar has free surplus
-  const smartNetDrainKw = Math.max(0.05, smartTotalKw - availableSolarKw);
-  const smartInverterOverloaded = smartTotalKw > inverterMaxKw;
-  const smartHours = smartInverterOverloaded
-    ? 0.0
-    : smartTotalKw <= availableSolarKw
-    ? 24.0
-    : usableBatteryKwh / smartNetDrainKw;
-  const smartSurvives = !smartInverterOverloaded && smartHours >= outageHours;
-
-  // Recommended minimum battery for 100% essential load survival
-  const recommendedBatteryKwh = Math.ceil(
-    (Math.max(0.1, essentialKw - availableSolarKw) * outageHours) / 0.85
-  );
-
-  // Estimated diesel generator fuel saved per blackout (approx 0.38 L per kWh + base idle)
-  const energyServedKwh = essentialKw * outageHours;
-  const dieselLitersSaved = Number((energyServedKwh * 0.42).toFixed(1));
-  const kesSavedPerOutage = Math.round(dieselLitersSaved * 185); // ~185 KES / liter
-
-  const activeScenarioObj =
-    SCENARIOS.find((s) => s.id === active_scenario) ?? SCENARIOS[0];
-
-  const activePresetObj =
-    USER_PRESETS.find((p) => p.id === presetId) ?? USER_PRESETS[1];
-
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 antialiased">
       <div className="max-w-5xl mx-auto px-6 py-8">
-        {/* HEADER */}
+        {/* OPERATOR HEADER */}
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-zinc-800/80">
           <div className="flex items-center gap-3">
-            <span className="text-base font-medium tracking-tight text-zinc-100">GridPulse</span>
-            <span className="text-zinc-700">/</span>
-            <span className="text-xs text-zinc-400">
-              Smart Backup &amp; Microgrid Protection
+            <button
+              onClick={() => setWorkspaceMode('consumer')}
+              className="text-xs text-zinc-400 hover:text-zinc-100 border border-zinc-800 rounded px-2.5 py-1 transition-colors"
+            >
+              ← Back to Backup Planner
+            </button>
+            <span className="text-sm font-medium text-zinc-200">
+              Operator Console
             </span>
-            <span className="inline-flex items-center gap-1.5 ml-2 text-[11px] font-mono text-zinc-500">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-zinc-500">
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
                   backendConnected ? 'bg-emerald-500' : 'bg-zinc-500'
                 }`}
               />
-              {backendConnected ? 'Live backend' : 'Interactive simulation'}
+              {backendConnected ? 'Live' : 'Simulated'}
             </span>
           </div>
 
-          <nav className="flex flex-wrap items-center gap-5 text-xs">
+          <nav className="flex items-center gap-6 text-xs">
             {(
               [
-                ['planner', 'Backup planner'],
-                ['overview', 'Live corridor'],
+                ['overview', 'Overview'],
                 ['topology', 'Topology'],
                 ['dispatch', 'Dispatch'],
                 ['protocol', 'Protocol'],
@@ -936,9 +1332,9 @@ export default function App() {
             ).map(([id, label]) => (
               <button
                 key={id}
-                onClick={() => setActiveTab(id)}
+                onClick={() => setOperatorTab(id)}
                 className={`py-1 transition-colors ${
-                  activeTab === id
+                  operatorTab === id
                     ? 'text-zinc-100 font-medium border-b border-zinc-100'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
@@ -949,480 +1345,110 @@ export default function App() {
           </nav>
         </header>
 
-        {/* TAB 0: PERSONAL BACKUP & SOLAR PLANNER (FOR EVERYDAY PEOPLE) */}
-        {activeTab === 'planner' && (
-          <div className="py-8 space-y-10">
-            {/* INTRO & PRESETS */}
-            <div className="space-y-4">
-              <div className="max-w-2xl">
-                <h1 className="text-lg font-medium text-zinc-100">
-                  Will your backup power survive the next blackout?
-                </h1>
-                <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
-                  Most inverters trip or drain their batteries early during a blackout because heavy
-                  appliances (water heaters, pumps, machinery) stay on alongside essential loads.
-                  Choose a setup below or enter your own numbers to see how smart load-shedding
-                  keeps critical equipment alive.
-                </p>
-              </div>
+        {/* SCENARIO & PROTECTION BAR */}
+        <section className="flex flex-wrap items-center justify-between gap-4 py-5 border-b border-zinc-800/60 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="text-zinc-500 mr-2">Condition</span>
+            {SCENARIOS.map((scn) => {
+              const active = active_scenario === scn.id;
+              return (
+                <button
+                  key={scn.id}
+                  onClick={() => triggerScenario(scn.id)}
+                  className={`px-3 py-1.5 rounded transition-colors ${
+                    active
+                      ? 'bg-zinc-100 text-zinc-950 font-medium'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+                  }`}
+                >
+                  {scn.label}
+                </button>
+              );
+            })}
+          </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                {USER_PRESETS.map((p) => {
-                  const active = presetId === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => selectPreset(p)}
-                      className={`p-4 text-left rounded-md border transition-colors ${
-                        active
-                          ? 'border-zinc-200 bg-zinc-900/70'
-                          : 'border-zinc-800/80 hover:border-zinc-700'
-                      }`}
-                    >
-                      <div className="text-xs font-medium text-zinc-100">{p.label}</div>
-                      <div className="mt-1 text-[11px] text-zinc-500">{p.subtitle}</div>
-                    </button>
-                  );
-                })}
-              </div>
+          <button
+            onClick={toggleAutoBalancer}
+            className="flex items-center gap-2.5 text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            <span>Auto-protection</span>
+            <span
+              className={`px-2 py-0.5 rounded text-[11px] font-mono ${
+                auto_balancer_enabled
+                  ? 'bg-emerald-500/10 text-emerald-400'
+                  : 'bg-rose-500/10 text-rose-400'
+              }`}
+            >
+              {auto_balancer_enabled ? 'On' : 'Off'}
+            </span>
+          </button>
+        </section>
+
+        {/* 4 KEY METRICS */}
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-8 py-8 border-b border-zinc-800/60">
+          <div>
+            <div className="text-xs text-zinc-500">Grid frequency</div>
+            <div
+              className={`mt-2 text-2xl font-mono font-normal tracking-tight tabular-nums ${
+                metrics.frequency_hz < 49.5 ? 'text-rose-400' : 'text-zinc-100'
+              }`}
+            >
+              {metrics.frequency_hz.toFixed(2)} <span className="text-sm text-zinc-500">Hz</span>
             </div>
-
-            {/* INTERACTIVE SLIDERS & COMPARISON RESULTS */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 pt-4 border-t border-zinc-800/60">
-              {/* LEFT 6 COLS: USER INPUT SLIDERS */}
-              <div className="lg:col-span-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-medium text-zinc-300">1. Your appliances &amp; solar setup</h2>
-                  <span className="text-[11px] text-zinc-500">Adjust sliders to match your site</span>
-                </div>
-
-                {/* Essential Load */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-300">Essential equipment (must stay on)</span>
-                    <span className="font-mono text-zinc-100 tabular-nums">
-                      {essentialKw.toFixed(1)} kW
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.2"
-                    max="25"
-                    step="0.2"
-                    value={essentialKw}
-                    onChange={(e) => setEssentialKw( parseFloat(e.target.value) )}
-                    className="w-full accent-zinc-100 bg-zinc-800 h-1.5 rounded cursor-pointer"
-                  />
-                  <div className="text-[11px] text-zinc-500">{activePresetObj.essentialDesc}</div>
-                </div>
-
-                {/* Flexible Load */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-300">Heavy / flexible equipment (can pause)</span>
-                    <span className="font-mono text-zinc-100 tabular-nums">
-                      {flexibleKw.toFixed(1)} kW
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="40"
-                    step="0.5"
-                    value={flexibleKw}
-                    onChange={(e) => setFlexibleKw( parseFloat(e.target.value) )}
-                    className="w-full accent-zinc-100 bg-zinc-800 h-1.5 rounded cursor-pointer"
-                  />
-                  <div className="text-[11px] text-zinc-500">{activePresetObj.flexibleDesc}</div>
-                </div>
-
-                {/* Battery Capacity */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-300">Battery storage size</span>
-                    <span className="font-mono text-zinc-100 tabular-nums">
-                      {batteryKwh.toFixed(1)} kWh
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="100"
-                    step="1"
-                    value={batteryKwh}
-                    onChange={(e) => setBatteryKwh( parseFloat(e.target.value) )}
-                    className="w-full accent-zinc-100 bg-zinc-800 h-1.5 rounded cursor-pointer"
-                  />
-                  <div className="text-[11px] text-zinc-500">
-                    Usable energy (85% LFP limit): {usableBatteryKwh.toFixed(1)} kWh
-                  </div>
-                </div>
-
-                {/* Solar & Inverter Row */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-300">Solar panels</span>
-                      <span className="font-mono text-zinc-100 tabular-nums">
-                        {solarKw.toFixed(1)} kW
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="50"
-                      step="0.5"
-                      value={solarKw}
-                      onChange={(e) => setSolarKw( parseFloat(e.target.value) )}
-                      className="w-full accent-zinc-100 bg-zinc-800 h-1.5 rounded cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-300">Inverter rating</span>
-                      <span className="font-mono text-zinc-100 tabular-nums">
-                        {inverterMaxKw.toFixed(1)} kW
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="50"
-                      step="0.5"
-                      value={inverterMaxKw}
-                      onChange={(e) => setInverterMaxKw( parseFloat(e.target.value) )}
-                      className="w-full accent-zinc-100 bg-zinc-800 h-1.5 rounded cursor-pointer"
-                    />
-                  </div>
-                </div>
-
-                {/* Outage Duration & Time of Day */}
-                <div className="pt-2 border-t border-zinc-800/60 space-y-4">
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-300">Expected blackout length</span>
-                      <span className="font-mono text-zinc-100 tabular-nums">
-                        {outageHours} hours
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="12"
-                      step="1"
-                      value={outageHours}
-                      onChange={(e) => setOutageHours( parseInt(e.target.value, 10) )}
-                      className="w-full accent-zinc-100 bg-zinc-800 h-1.5 rounded cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-400">When does the blackout happen?</span>
-                    <div className="flex items-center gap-1.5">
-                      {(
-                        [
-                          ['night', 'Night (no sun)'],
-                          ['cloudy', 'Cloudy day'],
-                          ['sunny', 'Sunny day'],
-                        ] as const
-                      ).map(([id, label]) => (
-                        <button
-                          key={id}
-                          onClick={() => setOutageTime(id)}
-                          className={`px-2.5 py-1 rounded transition-colors ${
-                            outageTime === id
-                              ? 'bg-zinc-100 text-zinc-950 font-medium'
-                              : 'text-zinc-400 hover:text-zinc-200 bg-zinc-900/60'
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT 6 COLS: PLAIN-ENGLISH SURVIVAL COMPARISON */}
-              <div className="lg:col-span-6 space-y-6">
-                <h2 className="text-xs font-medium text-zinc-300">
-                  2. Blackout survival comparison ({outageHours}-hour outage)
-                </h2>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* CARD A: WITHOUT GRIDPULSE */}
-                  <div className="p-5 rounded-md border border-zinc-800/90 bg-zinc-950/50 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-400">Standard setup (no load shedding)</span>
-                        <span
-                          className={`font-mono text-[11px] ${
-                            unmanagedSurvives ? 'text-emerald-400' : 'text-rose-400'
-                          }`}
-                        >
-                          {unmanagedInverterOverloaded
-                            ? 'Trips immediately'
-                            : unmanagedSurvives
-                            ? 'Survives'
-                            : 'Fails early'}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 text-3xl font-mono font-normal tracking-tight text-zinc-100 tabular-nums">
-                        {unmanagedInverterOverloaded ? (
-                          <span className="text-rose-400">0.0 hrs</span>
-                        ) : (
-                          <>
-                            {Math.min(24, unmanagedHours).toFixed(1)}{' '}
-                            <span className="text-sm text-zinc-500">hrs</span>
-                          </>
-                        )}
-                      </div>
-
-                      <p className="mt-3 text-xs text-zinc-400 leading-relaxed">
-                        {unmanagedInverterOverloaded
-                          ? `Total load (${unmanagedTotalKw.toFixed(1)} kW) exceeds your ${inverterMaxKw.toFixed(1)} kW inverter rating. The inverter trips off immediately.`
-                          : unmanagedSurvives
-                          ? `Your battery can run both essential and heavy loads (${unmanagedTotalKw.toFixed(1)} kW) for the full ${outageHours} hours.`
-                          : `Running all ${unmanagedTotalKw.toFixed(1)} kW drains the battery in ${unmanagedHours.toFixed(1)} hours, leaving you in the dark for ${(outageHours - unmanagedHours).toFixed(1)} hours.`}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-zinc-800/60 flex justify-between text-[11px] font-mono text-zinc-500">
-                      <span>Load: {unmanagedTotalKw.toFixed(1)} kW</span>
-                      <span>Solar: {availableSolarKw.toFixed(1)} kW</span>
-                    </div>
-                  </div>
-
-                  {/* CARD B: WITH GRIDPULSE */}
-                  <div className="p-5 rounded-md border border-zinc-700 bg-zinc-900/40 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-200 font-medium">With GridPulse protection</span>
-                        <span
-                          className={`font-mono text-[11px] ${
-                            smartSurvives ? 'text-emerald-400' : 'text-amber-400'
-                          }`}
-                        >
-                          {smartInverterOverloaded
-                            ? 'Inverter too small'
-                            : smartSurvives
-                            ? '100% protected'
-                            : 'Needs larger battery'}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 text-3xl font-mono font-normal tracking-tight text-emerald-400 tabular-nums">
-                        {smartInverterOverloaded ? (
-                          <span className="text-rose-400">0.0 hrs</span>
-                        ) : smartHours >= 24 ? (
-                          <>
-                            24+ <span className="text-sm text-zinc-400">hrs</span>
-                          </>
-                        ) : (
-                          <>
-                            {smartHours.toFixed(1)}{' '}
-                            <span className="text-sm text-zinc-400">hrs</span>
-                          </>
-                        )}
-                      </div>
-
-                      <p className="mt-3 text-xs text-zinc-300 leading-relaxed">
-                        {smartInverterOverloaded
-                          ? `Even your essential load (${essentialKw.toFixed(1)} kW) exceeds your ${inverterMaxKw.toFixed(1)} kW inverter. Upgrade inverter to at least ${Math.ceil(essentialKw + 1)} kW.`
-                          : smartSurvives
-                          ? `By automatically pausing ${flexibleKw.toFixed(1)} kW of heavy equipment during the blackout, your essential ${essentialKw.toFixed(1)} kW stays on for the entire ${outageHours}-hour outage.`
-                          : `Pausing heavy loads extends runtime to ${smartHours.toFixed(1)} hours. To last all ${outageHours} hours, increase battery size to ${recommendedBatteryKwh} kWh.`}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-zinc-800/60 flex justify-between text-[11px] font-mono text-zinc-400">
-                      <span>Protected load: {smartTotalKw.toFixed(1)} kW</span>
-                      <span>
-                        Gain: +
-                        {Math.max(0, Math.min(24, smartHours) - unmanagedHours).toFixed(1)} hrs
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* PRACTICAL TAKEAWAY & COST SAVINGS */}
-                <div className="p-4 rounded-md border border-zinc-800/80 bg-zinc-950/30 space-y-3 text-xs">
-                  <div className="font-medium text-zinc-200">Practical recommendation for your site</div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1 font-mono">
-                    <div>
-                      <div className="font-sans text-[11px] text-zinc-500">
-                        Minimum battery needed
-                      </div>
-                      <div className="mt-1 text-sm text-zinc-100 tabular-nums">
-                        {recommendedBatteryKwh} kWh LFP
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-sans text-[11px] text-zinc-500">
-                        Diesel avoided per blackout
-                      </div>
-                      <div className="mt-1 text-sm text-zinc-100 tabular-nums">
-                        {dieselLitersSaved} Liters (~KES {kesSavedPerOutage.toLocaleString()})
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-sans text-[11px] text-zinc-500">
-                        Recommended inverter
-                      </div>
-                      <div className="mt-1 text-sm text-zinc-100 tabular-nums">
-                        {Math.max(inverterMaxKw, Math.ceil((essentialKw + flexibleKw) * 1.15))} kVA
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 text-xs text-zinc-500">
-                  <span>
-                    Want to see how this works at the neighborhood transformer scale?
-                  </span>
-                  <button
-                    onClick={() => setActiveTab('overview')}
-                    className="text-zinc-200 hover:underline font-medium"
-                  >
-                    Open live corridor monitor →
-                  </button>
-                </div>
-              </div>
+            <div className="mt-1 text-xs font-mono text-zinc-500 tabular-nums">
+              {metrics.bus_voltage_v.toFixed(1)} V bus
             </div>
           </div>
-        )}
 
-        {/* COMMUNITY CORRIDOR VIEWS (OVERVIEW / TOPOLOGY / DISPATCH / PROTOCOL) */}
-        {activeTab !== 'planner' && (
-          <>
-            {/* SCENARIO & PROTECTION BAR */}
-            <section className="py-5 border-b border-zinc-800/60 space-y-3 text-xs">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-zinc-500 mr-2">Test a real-world situation:</span>
-                  {SCENARIOS.map((scn) => {
-                    const active = active_scenario === scn.id;
-                    return (
-                      <button
-                        key={scn.id}
-                        onClick={() => triggerScenario(scn.id)}
-                        className={`px-3 py-1.5 rounded transition-colors ${
-                          active
-                            ? 'bg-zinc-100 text-zinc-950 font-medium'
-                            : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                        }`}
-                      >
-                        {scn.label}
-                      </button>
-                    );
-                  })}
-                </div>
+          <div>
+            <div className="text-xs text-zinc-500">Transformer load</div>
+            <div
+              className={`mt-2 text-2xl font-mono font-normal tracking-tight tabular-nums ${
+                metrics.transformer_load_pct > 88
+                  ? 'text-rose-400'
+                  : metrics.transformer_load_pct > 78
+                  ? 'text-amber-400'
+                  : 'text-zinc-100'
+              }`}
+            >
+              {metrics.transformer_load_pct.toFixed(1)}
+              <span className="text-sm text-zinc-500">%</span>
+            </div>
+            <div className="mt-1 text-xs font-mono text-zinc-500 tabular-nums">
+              {metrics.transformer_temp_c.toFixed(1)} °C oil
+            </div>
+          </div>
 
-                <button
-                  onClick={toggleAutoBalancer}
-                  className="flex items-center gap-2.5 text-zinc-400 hover:text-zinc-200 transition-colors"
-                >
-                  <span>GridPulse auto-protection</span>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[11px] font-mono ${
-                      auto_balancer_enabled
-                        ? 'bg-emerald-500/10 text-emerald-400'
-                        : 'bg-rose-500/10 text-rose-400'
-                    }`}
-                  >
-                    {auto_balancer_enabled ? 'On' : 'Off'}
-                  </span>
-                </button>
-              </div>
+          <div>
+            <div className="text-xs text-zinc-500">Battery storage</div>
+            <div className="mt-2 text-2xl font-mono font-normal tracking-tight text-zinc-100 tabular-nums">
+              {metrics.bess_soc_pct.toFixed(1)}
+              <span className="text-sm text-zinc-500">%</span>
+            </div>
+            <div className="mt-1 text-xs font-mono text-zinc-500 tabular-nums">
+              {(metrics.bess_dispatch_kw > 0 ? '+' : '') + metrics.bess_dispatch_kw.toFixed(1)} kW
+            </div>
+          </div>
 
-              {/* PLAIN-ENGLISH EXPLANATION BANNER */}
-              <div className="text-xs text-zinc-400 bg-zinc-900/40 border border-zinc-800/70 rounded px-3.5 py-2.5">
-                <strong className="text-zinc-200 font-medium mr-1.5">What is happening:</strong>
-                {auto_balancer_enabled
-                  ? activeScenarioObj.plainExplanation
-                  : 'Auto-protection is turned OFF. The battery is not helping and non-essential loads are not being trimmed, putting the transformer at risk of tripping.'}
-              </div>
-            </section>
+          <div>
+            <div className="text-xs text-zinc-500">System state</div>
+            <div className="mt-2 text-lg font-medium tracking-tight text-zinc-100">
+              {formatStateLabel(system_state)}
+            </div>
+            <div className="mt-1 text-xs text-zinc-500">
+              Clinic uptime {metrics.clinic_uptime_pct.toFixed(0)}%
+            </div>
+          </div>
+        </section>
 
-            {/* 4 KEY METRICS WITH PLAIN-ENGLISH SUBTITLES */}
-            <section className="grid grid-cols-2 sm:grid-cols-4 gap-8 py-8 border-b border-zinc-800/60">
-              <div>
-                <div className="text-xs text-zinc-500">Power stability (Frequency)</div>
-                <div
-                  className={`mt-2 text-2xl font-mono font-normal tracking-tight tabular-nums ${
-                    metrics.frequency_hz < 49.5 ? 'text-rose-400' : 'text-zinc-100'
-                  }`}
-                >
-                  {metrics.frequency_hz.toFixed(2)}{' '}
-                  <span className="text-sm text-zinc-500">Hz</span>
-                </div>
-                <div className="mt-1 text-xs text-zinc-500">
-                  {metrics.frequency_hz >= 49.6
-                    ? 'Safe for appliances (240V)'
-                    : 'Danger: risk of blackout'}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-zinc-500">Neighborhood transformer</div>
-                <div
-                  className={`mt-2 text-2xl font-mono font-normal tracking-tight tabular-nums ${
-                    metrics.transformer_load_pct > 88
-                      ? 'text-rose-400'
-                      : metrics.transformer_load_pct > 78
-                      ? 'text-amber-400'
-                      : 'text-zinc-100'
-                  }`}
-                >
-                  {metrics.transformer_load_pct.toFixed(1)}
-                  <span className="text-sm text-zinc-500">%</span>
-                </div>
-                <div className="mt-1 text-xs text-zinc-500">
-                  Oil temp {metrics.transformer_temp_c.toFixed(0)} °C (limit 90%)
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-zinc-500">Community battery bank</div>
-                <div className="mt-2 text-2xl font-mono font-normal tracking-tight text-zinc-100 tabular-nums">
-                  {metrics.bess_soc_pct.toFixed(1)}
-                  <span className="text-sm text-zinc-500">%</span>
-                </div>
-                <div className="mt-1 text-xs text-zinc-500">
-                  {metrics.bess_dispatch_kw > 0
-                    ? `Supplying +${metrics.bess_dispatch_kw.toFixed(0)} kW to grid`
-                    : metrics.bess_dispatch_kw < 0
-                    ? `Charging (${Math.abs(metrics.bess_dispatch_kw).toFixed(0)} kW)`
-                    : 'Standby'}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-zinc-500">System status</div>
-                <div className="mt-2 text-lg font-medium tracking-tight text-zinc-100">
-                  {formatStateLabel(system_state)}
-                </div>
-                <div className="mt-1 text-xs text-emerald-400/90">
-                  Clinic power 100% online
-                </div>
-              </div>
-            </section>
-          </>
-        )}
-
-        {/* TAB 1: LIVE CORRIDOR OVERVIEW */}
-        {activeTab === 'overview' && (
+        {/* OPERATOR TAB 1: OVERVIEW */}
+        {operatorTab === 'overview' && (
           <div className="py-8 space-y-12">
-            {/* MINIMALIST SINGLE-LINE SCHEMATIC */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xs font-medium text-zinc-400">
-                  How power is flowing right now
-                </h2>
+                <h2 className="text-xs font-medium text-zinc-400">Corridor power flow</h2>
                 <span className="text-xs font-mono text-zinc-500">
-                  Clinic supply path: {hospitalRoute.join(' → ')}
+                  Priority route: {hospitalRoute.join(' → ')}
                 </span>
               </div>
 
@@ -1524,7 +1550,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* QUIET TREND SPARKLINE */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
               <div>
                 <div className="flex justify-between text-xs text-zinc-500 mb-3">
@@ -1578,10 +1603,9 @@ export default function App() {
               </div>
             </div>
 
-            {/* CLEAN NODES TABLE */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs font-medium text-zinc-400">Connected grid equipment</h2>
+                <h2 className="text-xs font-medium text-zinc-400">Nodes</h2>
                 <span className="text-xs font-mono text-zinc-500">
                   Selected: {selectedNode.node_id} ({selectedNode.temperature_c.toFixed(1)} °C)
                 </span>
@@ -1589,11 +1613,11 @@ export default function App() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-zinc-800 text-zinc-500 font-normal">
-                    <th className="py-2.5 font-normal">Equipment</th>
+                    <th className="py-2.5 font-normal">Node</th>
                     <th className="py-2.5 font-normal">ID</th>
-                    <th className="py-2.5 font-normal text-right">Power</th>
-                    <th className="py-2.5 font-normal text-right">Rated limit</th>
-                    <th className="py-2.5 font-normal text-right">Utilization</th>
+                    <th className="py-2.5 font-normal text-right">Active power</th>
+                    <th className="py-2.5 font-normal text-right">Capacity</th>
+                    <th className="py-2.5 font-normal text-right">Load</th>
                     <th className="py-2.5 font-normal text-right">Status</th>
                   </tr>
                 </thead>
@@ -1622,9 +1646,8 @@ export default function App() {
               </table>
             </div>
 
-            {/* MINIMAL EVENT LOG */}
             <div>
-              <h2 className="text-xs font-medium text-zinc-400 mb-3">Automated actions log</h2>
+              <h2 className="text-xs font-medium text-zinc-400 mb-3">Recent dispatch log</h2>
               <div className="divide-y divide-zinc-800/50 border-t border-zinc-800/80 text-xs">
                 {snapshot.recent_events.slice(0, 5).map((evt) => (
                   <div
@@ -1647,13 +1670,13 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 2: TOPOLOGY */}
-        {activeTab === 'topology' && subsystems && (
+        {/* OPERATOR TAB 2: TOPOLOGY */}
+        {operatorTab === 'topology' && subsystems && (
           <div className="py-8 space-y-10">
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xs font-medium text-zinc-400">
-                  Lowest-loss path to Referral Clinic (Dijkstra solver)
+                  Shortest-loss critical delivery path (Dijkstra)
                 </h2>
                 <span className="text-xs font-mono text-zinc-400 tabular-nums">
                   Impedance cost: {subsystems.network_routing.hospital_route.total_impedance_cost}
@@ -1702,8 +1725,8 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 3: DISPATCH */}
-        {activeTab === 'dispatch' && subsystems && (
+        {/* OPERATOR TAB 3: DISPATCH */}
+        {operatorTab === 'dispatch' && subsystems && (
           <div className="py-8 space-y-10">
             <div>
               <h2 className="text-xs font-medium text-zinc-400 mb-3">Battery dispatch profile</h2>
@@ -1797,8 +1820,8 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 4: PROTOCOL & SAFETY INTERLOCK */}
-        {activeTab === 'protocol' && subsystems && (
+        {/* OPERATOR TAB 4: PROTOCOL & SAFETY INTERLOCK */}
+        {operatorTab === 'protocol' && subsystems && (
           <div className="py-8 space-y-10">
             <div>
               <h2 className="text-xs font-medium text-zinc-400 mb-3">
