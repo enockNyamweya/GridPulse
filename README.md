@@ -4,10 +4,11 @@
 
 **Live deployment:** [https://gridpulse-ea.netlify.app](https://gridpulse-ea.netlify.app)
 
+![Deployment](https://img.shields.io/badge/Netlify-Live_Production-10b981?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-0284c7?style=flat-square)
 ![FastAPI](https://img.shields.io/badge/FastAPI-WebSocket_%2B_REST-059669?style=flat-square)
 ![SQLite](https://img.shields.io/badge/SQLite-WAL_ACID_Ledger-2563eb?style=flat-square)
-![React](https://img.shields.io/badge/React-18.3_%2B_TypeScript_5-0891b2?style=flat-square)
+![React](https://img.shields.io/badge/React-18.3_%2B_TypeScript_5-52525b?style=flat-square)
 ![Grid Standard](https://img.shields.io/badge/Nominal_Grid-50.00_Hz_%7C_240.0_V-10b981?style=flat-square)
 ![Protocol](https://img.shields.io/badge/RTU_Telemetry-64_Bit_CRC8-7c3aed?style=flat-square)
 
@@ -19,7 +20,7 @@ Kenya generates over 90% of its electricity from renewable sources, led by geoth
 
 The structural bottleneck lies in secondary distribution visibility and automated flexibility. Most 11 kV / 240 V step-down transformers operate without sub-second thermal telemetry or coordinated distributed storage. When evening commercial demand surges or rapid cloud transients reduce local solar photovoltaic output, transformers exceed their thermal ratings, frequency sags below the 49.20 Hz protection threshold, and feeder breakers trip.
 
-**GridPulse** solves this distribution coordination gap by combining a physics-grounded microgrid digital twin, graph-theoretic feeder routing, runtime-swappable BESS dispatch strategies, thread-safe ring buffer telemetry, 64-bit fixed-point Remote Terminal Unit (RTU) binary framing, formal propositional breaker interlocks, and an ACID-compliant SQLite Write-Ahead Logging (WAL) audit ledger.
+**GridPulse** addresses this distribution coordination gap by combining a physics-grounded microgrid digital twin, IEC 60076-7 transformer thermal modeling, graph-theoretic feeder routing, runtime-swappable BESS dispatch strategies, thread-safe ring buffer telemetry, 64-bit fixed-point Remote Terminal Unit (RTU) binary framing, formal propositional breaker interlocks, and an ACID-compliant SQLite Write-Ahead Logging (WAL) audit ledger.
 
 ---
 
@@ -29,9 +30,9 @@ The structural bottleneck lies in secondary distribution visibility and automate
 
 GridPulse is structured across three decoupled operational tiers:
 
-1. **Field telemetry and physics simulation layer (`backend/simulator.py`):** Computes real-time 50.00 Hz frequency droop, secondary bus voltage regulation, IEC 60076-7 transformer top-oil ($\Theta_{\text{oil}}$) and winding hot-spot ($\Theta_{\text{hs}}$) temperatures, relative thermal aging acceleration ($F_{\text{AA}}$), $I^2R$ corridor copper losses, short-horizon demand forecast error, and Lithium Iron Phosphate (LFP) battery Coulomb counting across a 6-node Kenyan distribution corridor at 1.5-second intervals.
-2. **Core control and algorithmic subsystems (`backend/core_subsystems.py` & `backend/database.py`):** Executes graph-based power routing, hierarchical zone rollups, pluggable inverter dispatch strategies, mutex-synchronized circular frame buffering, 64-bit bitwise telemetry encoding with CRC-8 verification, propositional breaker safety checks, and transactional SQL persistence.
-3. **Minimalist SCADA operator console (`frontend/src/App.tsx`):** Provides a hairline-grid utility HMI with an interactive IEEE Single-Line Diagram (SLD), clickable asset & 64-bit RTU register inspector, dense tabular telemetry matrix, and dual-channel strip chart recorder over full-duplex WebSockets (`ws://localhost:8000/ws`) with an autonomous client-side fallback engine.
+1. **Field telemetry and physics simulation layer ([`backend/simulator.py`](backend/simulator.py)):** Computes real-time 50.00 Hz frequency droop, secondary bus voltage regulation, IEC 60076-7 transformer top-oil ($\Theta_{\text{oil}}$) and winding hot-spot ($\Theta_{\text{hs}}$) temperatures, Arrhenius relative thermal aging acceleration ($F_{\text{AA}}$), $I^2R$ corridor copper losses, short-horizon demand forecast deviation, and Lithium Iron Phosphate (LFP) battery Coulomb counting across a 6-node Kenyan distribution corridor at 1.5-second intervals.
+2. **Core control and algorithmic subsystems ([`backend/core_subsystems.py`](backend/core_subsystems.py) & [`backend/database.py`](backend/database.py)):** Executes graph-based power routing, hierarchical zone rollups, pluggable inverter dispatch strategies, mutex-synchronized circular frame buffering, 64-bit bitwise telemetry encoding with CRC-8 verification, propositional breaker safety checks, and transactional SQL persistence.
+3. **Minimalist operator interface ([`frontend/src/App.tsx`](frontend/src/App.tsx)):** Provides a calm, restrained monochrome web interface organized around four focused views (`Overview`, `Topology`, `Dispatch`, `Protocol`). It connects over full-duplex WebSockets (`ws://localhost:8000/ws`) when paired with the local FastAPI backend and seamlessly transitions to an in-browser simulation engine when hosted statically on HTTPS ([https://gridpulse-ea.netlify.app](https://gridpulse-ea.netlify.app)).
 
 ---
 
@@ -52,76 +53,80 @@ GridPulse is structured across three decoupled operational tiers:
 
 ### Deterministic protection state machine
 
-| System state | Trigger condition | Automated control response |
-| :--- | :--- | :--- |
-| `STABLE` | Upstream feeder energized and transformer load $\le 78\%$ | Maintains nominal 50.00 Hz bus; trickle-charges `BESS-KSM-01` using surplus solar PV |
-| `BESS_DISPATCH_ACTIVE` | Net generation deficit $> 15\text{ kW}$ or transformer load $> 80\%$ | Commands the active BESS strategy to inject real power (up to $250\text{ kW}$) at the secondary bus |
-| `DEMAND_RESPONSE_SHED` | Severe surge where demand exceeds generation by $> 195\text{ kW}$ | Throttles flexible commercial load (`LOAD-COMM-02`) by 28% while preserving 100% power to `LOAD-HOSP-01` |
-| `FAULT_ISLANDING` | Upstream grid outage (`GEN-OLK-01` drops to $0\text{ kW}$) | Opens PCC breaker, forms a standalone Solar + BESS island, and curtails commercial load by 35% |
+| System state | UI status label | Trigger condition | Automated control response |
+| :--- | :--- | :--- | :--- |
+| `STABLE` | `Nominal` | Upstream feeder energized and transformer load $\le 78\%$ | Maintains nominal 50.00 Hz bus; trickle-charges `BESS-KSM-01` using surplus solar PV |
+| `BESS_DISPATCH_ACTIVE` | `Battery dispatch` | Net generation deficit $> 15\text{ kW}$ or transformer load $> 82\%$ | Commands the active BESS strategy to inject real power (up to $250\text{ kW}$) at the secondary bus |
+| `DEMAND_RESPONSE_SHED` | `Demand response` | Residual transformer load $> 88\%$ after battery support | Throttles flexible commercial load (`LOAD-COMM-02`) by 28% while preserving 100% power to `LOAD-HOSP-01` |
+| `FAULT_ISLANDING` | `Islanded` | Upstream grid outage (`GEN-OLK-01` drops to $0\text{ kW}$) | Opens PCC breaker, forms a standalone Solar + BESS island, and curtails commercial load to 55% |
 
 ---
 
 ## Core engineering subsystems
 
-### 1. Feeder graph routing and radial spanning topology
+### 1. IEC 60076-7 transformer thermal and aging model
+
+Implemented in [`MicrogridSimulator.step()`](backend/simulator.py). In addition to tracking real power flow across the 500 kVA Kasarani transformer (`TR-NRB-04`), the physics solver models top-oil thermal inertia, winding hot-spot temperature ($\Theta_{\text{hs}}$), and relative insulation aging acceleration ($F_{\text{AA}}$) as functions of the load ratio $K = L_{\text{TR}} / 100$:
+
+$$\Theta_{\text{hs}} = \Theta_{\text{oil}} + 22.0 \cdot K^{1.6}, \qquad F_{\text{AA}} = \exp\left(\frac{15000}{383} - \frac{15000}{\Theta_{\text{hs}} + 273}\right)$$
+
+### 2. Feeder graph routing and radial spanning topology
 
 Implemented in [`GridTopologyGraph`](backend/core_subsystems.py) using a custom array-backed binary priority queue ([`MinHeap`](backend/core_subsystems.py)):
 
-* **Dynamic thermal impedance weighting:** Each feeder line $(u, v)$ has a base resistance weight $w_0(u, v)$. As load on the Kasarani transformer (`TR-NRB-04`) exceeds $70\%$, copper losses increase non-linearly:
-  $$w_{\text{eff}}(u, v) = w_0(u, v) + \max\left(0,\; \frac{L_{\text{TR}} - 70}{15}\right)$$
-* **Shortest-loss hospital delivery (`shortest_loss_path`):** Runs Dijkstra's algorithm ($O((V + E)\log V)$) from the active bulk source to `LOAD-HOSP-01`. Under nominal loading, power routes through `TR-NRB-04`. Under thermal stress, elevated transformer impedance causes the router to shift hospital delivery through the local battery bus (`BESS-KSM-01`).
+* **Dynamic thermal impedance weighting:** Each feeder line $(u, v)$ has a base resistance weight $w_0(u, v)$. As load on `TR-NRB-04` exceeds $75\%$, winding copper losses increase non-linearly:
+  $$w_{\text{eff}}(u, v) = w_0(u, v) + \max\bigl(0,\; (L_{\text{TR}} - 75.0) \times 0.12\bigr)$$
+* **Shortest-loss hospital delivery (`shortest_loss_path`):** Runs Dijkstra's algorithm ($O((V + E)\log V)$) from the active bulk source to `LOAD-HOSP-01`. Under nominal loading, power routes directly through `TR-NRB-04`. Under thermal stress, elevated transformer impedance causes the router to shift hospital delivery through the local battery bus (`BESS-KSM-01`).
 * **Loop-free radial network enforcement (`radial_spanning_tree`):** Runs Prim's Minimum Spanning Tree algorithm across all energized nodes so secondary distribution feeders remain strictly radial without circulating fault currents.
 
-### 2. Hierarchical zone aggregation and pluggable BESS dispatch profiles
+### 3. Hierarchical zone aggregation and pluggable BESS dispatch profiles
 
 Implemented via [`GridComponent`](backend/core_subsystems.py), [`CompositeDistributionZone`](backend/core_subsystems.py), and [`DispatchStrategy`](backend/core_subsystems.py):
 
 * **Recursive zone power tree:** Models the corridor as a hierarchical tree (`ZONE-KE-CORRIDOR` $\rightarrow$ `ZONE-RIFT-GEN` + `ZONE-NRB-NORTH` $\rightarrow$ Leaf Units) where `compute_net_power_kw()` recursively aggregates generation, storage injection, and load demand.
-* **Runtime-swappable inverter dispatch strategies:** Operators can switch the active BESS control law via `POST /api/strategy` without restarting the simulation loop:
+* **Runtime-swappable inverter dispatch profiles:** Operators can switch the active BESS control law in the `Dispatch` tab (`POST /api/strategy`) without restarting the simulation loop:
 
 | Strategy key | Control objective | Mathematical dispatch law |
 | :--- | :--- | :--- |
-| `PROPORTIONAL_DROOP` | Balanced frequency-watt droop and peak shaving | $P_{\text{BESS}} = \min(P_{\max},\; 1.05 \cdot \Delta P_{\text{deficit}} + 15\text{ kW})$ when $\Delta P_{\text{deficit}} > 15\text{ kW}$ |
-| `AGGRESSIVE_PEAK_SHAVING` | Keep transformer utilization strictly below 65% | Discharges $1.35\times$ surplus load above $65\%$ rating; charges at $-65\text{ kW}$ during off-peak |
-| `CONSERVATIVE_CLINIC_RESERVE` | Preserve battery State of Charge ($\ge 45\%$) for blackouts | Holds inverter on standby during moderate peaks unless transformer load exceeds $88\%$ or PCC islands |
+| `PROPORTIONAL_DROOP` | Balanced frequency-watt droop and peak shaving | $P_{\text{BESS}} = \min\bigl(P_{\max},\; \max(20,\; P_{\text{dem}} - 0.76 \cdot S_{\text{rated}})\bigr)$; curtails commercial load to $72\%$ if residual load $> 88\%$ |
+| `AGGRESSIVE_PEAK_SHAVING` | Strictly cap transformer utilization at 68% ($340\text{ kW}$) | $P_{\text{BESS}} = \min\bigl(P_{\max},\; P_{\text{dem}} - 0.68 \cdot S_{\text{rated}}\bigr)$ when $\text{SoC} > 20\%$ to minimize thermal aging |
+| `CONSERVATIVE_CLINIC_RESERVE` | Preserve battery State of Charge for extended blackouts | Curtails flexible commercial load to $68\%$ first when load $> 80\%$; discharges BESS only if reduced load exceeds $82\%$ and $\text{SoC} > 40\%$ |
 
-### 3. Thread-safe telemetry ring buffer and atomic state transitions
+### 4. Thread-safe telemetry ring buffer and atomic state transitions
 
 Implemented in [`SynchronizedTelemetryMonitor`](backend/core_subsystems.py):
 
 * **Reentrant mutex (`threading.RLock`):** Serializes concurrent access between the background 1.5-second physics loop, asynchronous WebSocket broadcast coroutines, and incoming HTTP fault-injection mutations.
-* **Bounded 32-slot circular ring buffer:** Writes telemetry frames at index `write_cursor % 32` in $O(1)$ constant memory without heap growth or dropped frames.
-* **Compare-And-Swap (CAS) state version guard:** Every state mutation verifies `expected_version == self.state_version` inside the critical section before incrementing the monotonic state counter.
+* **Bounded 32-slot circular ring buffer:** Writes telemetry frames at index `write_seq % 32` in $O(1)$ constant memory without heap growth or dropped frames.
+* **Compare-And-Swap (CAS) state version guard:** Every state transition verifies `expected_version == self.state_version` inside the critical section before incrementing the monotonic state counter.
 
-### 4. 64-bit RTU binary frame codec and CRC-8 verification
+### 5. 64-bit RTU binary frame codec and CRC-8 verification
 
 ![64-Bit RTU Binary Packet Layout](docs/rtu-frame-bit-layout.svg)
 
 Implemented in [`RTUBinaryCodec`](backend/core_subsystems.py) to mirror industrial SCADA serial/TCP framing over constrained cellular links:
 
-| Bit range | Field identifier | Encoding format | Scaling & engineering range |
+| Byte / bit offset | Field identifier | Encoding format | Scaling & engineering range |
 | :--- | :--- | :--- | :--- |
-| `Bits [63:56]` | `NODE_ID` | 8-bit unsigned integer | `0x01` (`GEN-OLK-01`) through `0x06` (`LOAD-COMM-02`) |
-| `Bits [55:48]` | `STATUS_FLAGS` | 8-bit bitmask register | `Bit 0`: Online, `Bit 1`: Overload, `Bit 2`: Priority-1, `Bit 3`: Curtailed/Active |
-| `Bits [47:32]` | `ACTIVE_POWER_KW` | 16-bit signed two's complement | Scaled by $\times 10$ ($0.1\text{ kW}$ resolution, $-3276.8$ to $+3276.7\text{ kW}$) |
-| `Bits [31:16]` | `BUS_VOLTAGE_V` | 16-bit unsigned integer | Scaled by $\times 10$ ($0.1\text{ V}$ resolution, $0.0$ to $6553.5\text{ V}$) |
-| `Bits [15:4]` | `FREQ_OFFSET` | 12-bit unsigned integer | Scaled as $(f_{\text{Hz}} - 45.00) \times 100$ ($0.01\text{ Hz}$ resolution) |
-| `Byte 7 [7:0]` | `CRC8_CHECKSUM` | 8-bit polynomial checksum | Generator polynomial $G(x) = x^8 + x^2 + x + 1$ (`0x07`) over Bytes `0..6` |
+| `Byte 0 [63:56]` | `SYNC_HEADER` | 8-bit constant | Fixed `0xA5` frame alignment marker |
+| `Byte 1 [55:48]` | `NODE_ID \| FLAGS` | Two 4-bit nibbles | `[7:4]` Node index (`1..6`); `[3:0]` Flags (`Online`, `Fault`, `BESS`, `Priority-1`) |
+| `Bytes 2..3 [47:32]` | `VOLTAGE_UINT16` | 16-bit unsigned big-endian | Decivolts ($V \times 10$, e.g., $240.0\text{ V} \rightarrow 2400 \rightarrow \text{0x0960}$) |
+| `Bytes 4..5 [31:16]` | `FREQUENCY_UINT16` | 16-bit unsigned big-endian | Centihertz ($f_{\text{Hz}} \times 100$, e.g., $50.00\text{ Hz} \rightarrow 5000 \rightarrow \text{0x1388}$) |
+| `Byte 6 [15:8]` | `LOAD_UINT8` | 8-bit unsigned integer | Asset load utilization percentage (`0..255%`) |
+| `Byte 7 [7:0]` | `CRC8_CHECKSUM` | 8-bit polynomial checksum | Generator polynomial $G(x) = x^8 + x^2 + x + 1$ (`0x07`) computed over Bytes `0..6` |
 
-### 5. Formal propositional breaker safety interlock
+### 6. Formal propositional breaker safety interlock
 
-Implemented in [`BreakerSafetyInterlock`](backend/core_subsystems.py). Before any automated feeder reconfiguration or load-shedding relay closes, the controller evaluates six atomic boolean propositions:
+Implemented in [`BreakerSafetyInterlock`](backend/core_subsystems.py). Before any automated feeder reconfiguration or inverter dispatch command is committed, the controller evaluates six atomic boolean propositions:
 
-$$\Phi_{\text{safe}} = \bigl(P \lor (S \land B)\bigr) \land \neg T \land F \land C$$
+$$\Phi_{\text{safe}} \equiv \bigl(D \rightarrow (S \land (Q \lor R \lor \neg P))\bigr) \land (\neg P \rightarrow C) \land C$$
 
 * $P$: Upstream national grid feeder is energized (`GEN-OLK-01 > 0 kW`)
-* $S$: Autonomous Solar + BESS islanding mode is engaged (`BESS_DISPATCH > 0 kW` while $\neg P$)
-* $B$: LFP storage reserve exceeds minimum safety floor ($\text{SoC} > 15.0\%$)
-* $T$: Kasarani transformer exceeds critical thermal limit ($\text{Load} > 95.0\%$)
-* $F$: Secondary bus frequency is within relay trip bounds ($f \ge 49.20\text{ Hz}$)
+* $Q$: Kasarani transformer thermal guard threshold is exceeded ($\text{Load} > 82.0\%$)
+* $R$: Secondary bus frequency droop trigger is active ($f < 49.65\text{ Hz}$)
+* $S$: LFP storage reserve exceeds minimum safety floor ($\text{SoC} > 15.0\%$)
+* $D$: BESS inverter is actively discharging real power ($P_{\text{BESS}} > 0\text{ kW}$)
 * $C$: Priority-1 Referral Clinic feeder continuity is verified
-
-If $\Phi_{\text{safe}}$ evaluates to `False`, `EMERGENCY_BREAKER_TRIP_REQUIRED` is raised immediately.
 
 ---
 
@@ -159,6 +164,8 @@ On every telemetry cycle, [`fetch_sql_analytics()`](backend/database.py) execute
 ```text
 gridpulse/
 ├── README.md
+├── LICENSE
+├── netlify.toml                # Netlify continuous deployment configuration (frontend/dist)
 ├── .gitignore
 ├── docs/
 │   ├── system-architecture.svg
@@ -166,7 +173,7 @@ gridpulse/
 │   └── rtu-frame-bit-layout.svg
 ├── backend/
 │   ├── main.py                 # FastAPI server, REST endpoints, and /ws WebSocket broadcaster
-│   ├── simulator.py            # 6-node Kenyan microgrid physics engine and state coordinator
+│   ├── simulator.py            # 6-node Kenyan microgrid physics engine and IEC 60076-7 thermal model
 │   ├── core_subsystems.py      # Graph routing, Strategy/Composite, Mutex/CAS, 64-bit RTU, Interlock
 │   ├── database.py             # SQLite WAL connection manager, ACID event logger, SQL analytics
 │   ├── schema.sql              # Normalized 3NF relational schema and seed definitions
@@ -179,8 +186,8 @@ gridpulse/
     ├── tailwind.config.js
     └── src/
         ├── main.tsx            # React 18 root mount
-        ├── App.tsx             # 4-tab Operator Control Center + standalone Edge Digital Twin
-        ├── index.css           # Tailwind CSS layers and industrial scrollbar styling
+        ├── App.tsx             # Minimalist 4-view operator interface + client-side simulation engine
+        ├── index.css           # Typography (Inter + JetBrains Mono) and tabular-num rules
         └── types/
             └── grid.ts         # TypeScript interfaces for telemetry, nodes, and subsystems
 ```
@@ -204,7 +211,7 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 When started, the backend automatically initializes `backend/gridpulse.db` in SQLite WAL mode, seeds the 6 Kenyan grid assets, and begins streaming 1.5-second telemetry ticks at `ws://localhost:8000/ws`.
 
-### 2. Start the React operator control center
+### 2. Start the React operator interface
 
 ```bash
 cd frontend
@@ -214,5 +221,5 @@ npm run dev
 
 Open `http://localhost:5173` in your browser:
 
-* When the FastAPI backend is running on port `8000`, the top status badge displays `FASTAPI + SQLITE WAL CONNECTED`.
-* If the frontend is built statically (`npm run build`) and deployed without a backend server, it automatically transitions to `EDGE DIGITAL TWIN ACTIVE`, running the full physics, graph routing, bitwise RTU framing, and safety interlock algorithms directly in the browser.
+* When the FastAPI backend is running locally on port `8000`, the header indicator displays `Live` (connected via WebSocket to FastAPI and SQLite WAL).
+* When deployed statically (such as on [https://gridpulse-ea.netlify.app](https://gridpulse-ea.netlify.app)), the header indicator displays `Simulated`, executing the full physics, graph routing, bitwise RTU framing, and safety interlock algorithms directly in the browser.
